@@ -39,7 +39,6 @@ const Register = () => {
         if (!formData.fullName || !formData.username || !formData.password || !formData.confirmPassword) {
             const errorMsg = 'Please fill in all required fields';
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
             setLoading(false);
             return;
         }
@@ -48,7 +47,6 @@ const Register = () => {
         if (formData.password !== formData.confirmPassword) {
             const errorMsg = 'Passwords do not match';
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
             setLoading(false);
             return;
         }
@@ -57,7 +55,6 @@ const Register = () => {
         if (formData.password.length < 6) {
             const errorMsg = 'Password must be at least 6 characters long';
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
             setLoading(false);
             return;
         }
@@ -67,7 +64,6 @@ const Register = () => {
         if (!emailRegex.test(formData.username)) {
             const errorMsg = 'Please enter a valid email address';
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
             setLoading(false);
             return;
         }
@@ -76,7 +72,6 @@ const Register = () => {
         if (role === 'student' && !formData.studentId) {
             const errorMsg = 'Student ID is required';
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
             setLoading(false);
             return;
         }
@@ -84,7 +79,6 @@ const Register = () => {
         if (role === 'officer' && !formData.orgId) {
             const errorMsg = 'Organization ID is required';
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
             setLoading(false);
             return;
         }
@@ -111,12 +105,10 @@ const Register = () => {
             console.log('API response:', response);
             
             if (response.success) {
-                alert(`✅ Registration successful! Welcome, ${formData.fullName}!`);
                 navigate('/dashboard');
             } else {
                 const errorMsg = response.message || 'Registration failed';
                 setError(errorMsg);
-                alert(`❌ ${errorMsg}`);
             }
         } catch (err) {
             console.error('Caught error:', err);
@@ -133,7 +125,6 @@ const Register = () => {
             }
             
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
         } finally {
             setLoading(false);
         }

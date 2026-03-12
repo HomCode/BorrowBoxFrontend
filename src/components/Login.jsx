@@ -17,7 +17,6 @@ const Login = () => {
         if (!username || !password) {
             const errorMsg = 'Please enter both email and password';
             setError(errorMsg);
-            alert(errorMsg);
             return;
         }
         
@@ -35,18 +34,15 @@ const Login = () => {
                 
                 // Show welcome message with role
                 if (userRole === 'student') {
-                    alert('✅ Welcome Student! Login successful.');
+                    // Welcome Student message
                 } else if (userRole === 'officer') {
-                    alert('✅ Welcome Officer! Login successful.');
-                } else {
-                    alert('✅ Login successful!');
+                    // Welcome Officer message
                 }
                 
                 navigate('/dashboard');
             } else {
                 const errorMsg = response.message || 'Login failed';
                 setError(errorMsg);
-                alert(`❌ ${errorMsg}`);
             }
         } catch (err) {
             console.error('Caught error:', err);
@@ -54,14 +50,13 @@ const Login = () => {
             // Handle different error types with specific messages
             let errorMsg = err.message || 'Login failed';
             
-            if (errorMsg.includes('Invalid credentials') || errorMsg.includes('401')) {
+            if (errorMsg.includes('invalid email or password') || errorMsg.includes('401')) {
                 errorMsg = 'Invalid email or password. Please try again.';
             } else if (errorMsg.includes('Network Error')) {
                 errorMsg = 'Cannot connect to server. Please check if backend is running.';
             }
             
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
         } finally {
             setLoading(false);
         }
