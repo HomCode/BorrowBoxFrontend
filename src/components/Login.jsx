@@ -17,7 +17,6 @@ const Login = () => {
         if (!username || !password) {
             const errorMsg = 'Please enter both email and password';
             setError(errorMsg);
-            alert(errorMsg);
             return;
         }
         
@@ -46,7 +45,6 @@ const Login = () => {
             } else {
                 const errorMsg = response.message || 'Login failed';
                 setError(errorMsg);
-                alert(`❌ ${errorMsg}`);
             }
         } catch (err) {
             console.error('Caught error:', err);
@@ -61,7 +59,6 @@ const Login = () => {
             }
             
             setError(errorMsg);
-            alert(`❌ ${errorMsg}`);
         } finally {
             setLoading(false);
         }

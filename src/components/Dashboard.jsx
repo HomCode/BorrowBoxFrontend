@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';  // ADDED Link import
 import { getCurrentUser, logout, isAuthenticated } from '../api/auth';
 
 const Dashboard = () => {
@@ -46,6 +46,13 @@ const Dashboard = () => {
                     </p>
                     {user.studentId && <p><strong>Student ID:</strong> {user.studentId}</p>}
                     {user.orgId && <p><strong>Organization ID:</strong> {user.orgId}</p>}
+                </div>
+
+                {/* NEW: Profile Link Button */}
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
+                    <Link to="/profile" className="btn btn-primary" style={{ textDecoration: 'none', width: 'auto' }}>
+                        View Profile
+                    </Link>
                 </div>
 
                 <button onClick={handleLogout} className="btn btn-primary">

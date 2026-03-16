@@ -1,12 +1,24 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8080/api/auth';
+const API_URL = 'http://localhost:8080/api';
+const AUTH_URL = `${API_URL}/auth`;
+const PROFILE_URL = `${API_URL}/profile`;
+
+const authAxios = () => {
+    const token = localStorage.getItem('token');
+    return axios.create({
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+};
 
 export const login = async (username, password) => {
     console.log('📤 Login API called with:', { username });
     
     try {
-        const response = await axios.post(`${API_URL}/login`, {
+        const response = await axios.post(`${AUTH_URL}/login`, {
             username,
             password
         });
@@ -23,7 +35,6 @@ export const login = async (username, password) => {
     } catch (error) {
         console.error('❌ Login error:', error.response?.data || error.message);
         
-        // Extract error message from response
         let errorMessage = 'Login failed';
         
         if (error.response?.data?.message) {
@@ -42,7 +53,7 @@ export const register = async (userData) => {
     console.log('📤 Register API called with:', { ...userData, password: '***' });
     
     try {
-        const response = await axios.post(`${API_URL}/register`, userData);
+        const response = await axios.post(`${AUTH_URL}/register`, userData);
         
         console.log('📥 Register response:', response.data);
         
@@ -56,7 +67,6 @@ export const register = async (userData) => {
     } catch (error) {
         console.error('❌ Register error:', error.response?.data || error.message);
         
-        // Extract error message from response
         let errorMessage = 'Registration failed';
         
         if (error.response?.data?.message) {
@@ -67,13 +77,144 @@ export const register = async (userData) => {
             errorMessage = error.message;
         }
         
-        // Check for specific error types
         if (error.response?.status === 401) {
             errorMessage = 'Authentication failed. Please check your credentials.';
         } else if (error.response?.status === 409) {
             errorMessage = 'User already exists. Please use a different email.';
         } else if (error.response?.status === 429) {
             errorMessage = 'Too many registration attempts. Please try again later.';
+        }
+        
+        throw new Error(errorMessage);
+    }
+};
+
+export const getProfile = async () => {
+    console.log('📤 Get Profile API called');
+    
+    try {
+        const response = await authAxios().get(`${PROFILE_URL}`);
+        console.log('📥 Profile response:', response.data);
+
+        if (response.data.success && response.data.user) {
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+        }
+
+        return response.data;
+    } catch (error) {
+        console.error('❌ Get Profile error:', error.response?.data || error.message);
+        
+        let errorMessage = 'Failed to fetch profile';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        }
+        
+        throw new Error(errorMessage);
+    }
+};
+
+export const updateProfile = async (profileData) => {
+    console.log('📤 Update Profile API called with:', profileData);
+    
+    try {
+        const response = await authAxios().put(`${PROFILE_URL}`, profileData);
+        
+        console.log('📥 Update Profile response:', response.data);
+        
+        if (response.data.success && response.data.user) {
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+        }
+        
+        return response.data;
+    } catch (error) {
+        console.error('❌ Update Profile error:', error.response?.data || error.message);
+        
+        let errorMessage = 'Failed to update profile';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        }
+        
+        throw new Error(errorMessage);
+    }
+};
+
+export const updatePassword = async (passwordData) => {
+    console.log('📤 Update Password API called');
+    
+    try {
+        const response = await authAxios().put(`${PROFILE_URL}/password`, passwordData);
+        
+        console.log('📥 Update Password response:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('❌ Update Password error:', error.response?.data || error.message);
+        
+        let errorMessage = 'Failed to update password';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        }
+        
+        throw new Error(errorMessage);
+    }
+};
+
+export const uploadPhoto = async (file) => {
+    console.log('📤 Upload Photo API called');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const token = localStorage.getItem('token');
+
+        const response = await axios.post(`${PROFILE_URL}/photo`, formData, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        
+        console.log('📥 Upload Photo response:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('❌ Upload Photo error:', error.response?.data || error.message);
+        
+        let errorMessage = 'Failed to upload photo';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        }
+        
+        throw new Error(errorMessage);
+    }
+};
+
+export const getPhotoBlobUrl = async () => {
+    try {
+        const response = await authAxios().get(`${PROFILE_URL}/photo`, {
+            responseType: 'blob'
+        });
+
+        return URL.createObjectURL(response.data);
+    } catch (error) {
+        console.error('❌ Get Photo error:', error.response?.data || error.message);
+        return null;
+    }
+};
+
+export const deletePhoto = async () => {
+    console.log('📤 Delete Photo API called');
+    
+    try {
+        const response = await authAxios().delete(`${PROFILE_URL}/photo`);
+        
+        console.log('📥 Delete Photo response:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('❌ Delete Photo error:', error.response?.data || error.message);
+        
+        let errorMessage = 'Failed to delete photo';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
         }
         
         throw new Error(errorMessage);
