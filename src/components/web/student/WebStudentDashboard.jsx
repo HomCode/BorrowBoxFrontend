@@ -115,7 +115,7 @@ export function WebStudentDashboard() {
               </div>
 
               <button
-                onClick={() => navigate('/profile')}
+                onClick={() => {}}
                 className="w-full bg-[#10B981] text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors"
               >
                 View Details

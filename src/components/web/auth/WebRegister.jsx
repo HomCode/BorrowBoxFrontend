@@ -7,7 +7,6 @@ import {
   User,
   CreditCard,
   Building,
-  ArrowLeft,
   GraduationCap,
   Briefcase
 } from 'lucide-react';
@@ -18,7 +17,7 @@ export function WebRegister() {
   const [selectedRole, setSelectedRole] = useState(null);
   const [formData, setFormData] = useState({
     fullName: '',
-    username: '',
+    email: '',
     studentId: '',
     orgId: '',
     password: '',
@@ -35,7 +34,7 @@ export function WebRegister() {
     try {
       const payload = {
         fullName: formData.fullName,
-        username: formData.username,
+        email: formData.email,
         password: formData.password,
         confirmPassword: formData.confirmPassword,
         role: selectedRole === 'STUDENT' ? 'student' : 'officer',
@@ -53,26 +52,24 @@ export function WebRegister() {
           navigate('/web/officer/dashboard');
         }
       } else {
-        setError(response.message || 'Registration failed');
+        setError(response.message || 'Registration failed.');
       }
     } catch (err) {
-      setError(err.message || 'Registration failed');
+      let message = err.message || 'Registration failed.';
+
+      if (message.includes('over_email_send_rate_limit')) {
+        message = 'Too many signup attempts. Please wait a few minutes before trying again.';
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4 font-['Inter']">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        <button
-          onClick={() => navigate('/web/login')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="text-sm">Back to Login</span>
-        </button>
-
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-[#2563EB] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -83,8 +80,9 @@ export function WebRegister() {
           </div>
 
           {error && (
-            <div className="bg-red-100 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
+              <p className="font-semibold mb-1">Registration failed</p>
+              <p>{error}</p>
             </div>
           )}
 
@@ -169,16 +167,16 @@ export function WebRegister() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Username
+                    Email Address
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
-                      type="text"
-                      value={formData.username}
-                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent outline-none"
-                      placeholder="Enter your username"
+                      placeholder="Enter your email address"
                       required
                     />
                   </div>

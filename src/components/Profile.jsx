@@ -15,17 +15,17 @@ const Profile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   const [editMode, setEditMode] = useState(false);
+  const [passwordMode, setPasswordMode] = useState(false);
+
   const [editForm, setEditForm] = useState({
     fullName: '',
     studentId: '',
     orgId: ''
   });
 
-  const [passwordMode, setPasswordMode] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -35,7 +35,15 @@ const Profile = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [photoUrl, setPhotoUrl] = useState(null);
-  const [uploading, setUploading] = useState(false);
+
+  const [photoError, setPhotoError] = useState('');
+  const [photoSuccess, setPhotoSuccess] = useState('');
+
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
+
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
 
   const navigate = useNavigate();
 
@@ -46,14 +54,33 @@ const Profile = () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       if (photoUrl) URL.revokeObjectURL(photoUrl);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const clearPhotoMessages = () => {
+    setPhotoError('');
+    setPhotoSuccess('');
+  };
+
+  const clearProfileMessages = () => {
+    setProfileError('');
+    setProfileSuccess('');
+  };
+
+  const clearPasswordMessages = () => {
+    setPasswordError('');
+    setPasswordSuccess('');
+  };
 
   const loadProfile = async () => {
     setLoading(true);
-    setError('');
+    clearPhotoMessages();
+    clearProfileMessages();
+    clearPasswordMessages();
 
     try {
       const currentUser = getCurrentUser();
+
       if (!currentUser) {
         navigate('/web/login');
         return;
@@ -62,6 +89,7 @@ const Profile = () => {
       setUser(currentUser);
 
       const response = await getProfile();
+
       if (response.success) {
         setProfile(response.user);
         setUser(response.user);
@@ -81,8 +109,7 @@ const Profile = () => {
         }
       }
     } catch (err) {
-      setError(err.message);
-      console.error('Failed to load profile:', err);
+      setProfileError(err.message || 'Failed to load profile');
     } finally {
       setLoading(false);
     }
@@ -103,43 +130,43 @@ const Profile = () => {
   };
 
   const handleFileSelect = (e) => {
+    clearPhotoMessages();
+
     const file = e.target.files[0];
+    if (!file) return;
 
-    if (file) {
-      if (!file.type.match('image/jpeg') && !file.type.match('image/png')) {
-        setError('Please select a JPG or PNG image');
-        return;
-      }
-
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
-        return;
-      }
-
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setError('');
+    if (!file.type.match('image/jpeg') && !file.type.match('image/png')) {
+      setPhotoError('Please select a JPG or PNG image');
+      return;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError('File size must be less than 5MB');
+      return;
+    }
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
   };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
+    clearProfileMessages();
     setUpdating(true);
-    setError('');
-    setSuccess('');
 
     try {
       const response = await updateProfile(editForm);
+
       if (response.success) {
-        setSuccess('Profile updated successfully!');
+        setProfileSuccess('Profile updated successfully!');
         setEditMode(false);
         setProfile(response.user);
         setUser(response.user);
       }
     } catch (err) {
-      setError(err.message);
+      setProfileError(err.message || 'Failed to update profile');
     } finally {
       setUpdating(false);
     }
@@ -147,25 +174,30 @@ const Profile = () => {
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
+    clearPasswordMessages();
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError('New passwords do not match');
+      setPasswordError('New passwords do not match');
       return;
     }
 
     if (passwordForm.newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      setPasswordError('New password cannot be the same as your current password');
       return;
     }
 
     setUpdating(true);
-    setError('');
-    setSuccess('');
 
     try {
       const response = await updatePassword(passwordForm);
+
       if (response.success) {
-        setSuccess('Password updated successfully!');
+        setPasswordSuccess('Password updated successfully!');
         setPasswordMode(false);
         setPasswordForm({
           currentPassword: '',
@@ -174,26 +206,27 @@ const Profile = () => {
         });
       }
     } catch (err) {
-      setError(err.message);
+      setPasswordError(err.message || 'Failed to update password');
     } finally {
       setUpdating(false);
     }
   };
 
   const handleUploadPhoto = async () => {
+    clearPhotoMessages();
+
     if (!selectedFile) {
-      setError('Please select a file first');
+      setPhotoError('Please select a file first');
       return;
     }
 
     setUploading(true);
-    setError('');
-    setSuccess('');
 
     try {
       const response = await uploadPhoto(selectedFile);
+
       if (response.success) {
-        setSuccess('Photo uploaded successfully!');
+        setPhotoSuccess('Photo uploaded successfully!');
         setSelectedFile(null);
 
         if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -202,25 +235,26 @@ const Profile = () => {
         await loadProfile();
       }
     } catch (err) {
-      setError(err.message);
+      setPhotoError(err.message || 'Failed to upload photo');
     } finally {
       setUploading(false);
     }
   };
 
   const handleDeletePhoto = async () => {
+    clearPhotoMessages();
+
     if (!window.confirm('Are you sure you want to delete your profile photo?')) {
       return;
     }
 
     setUpdating(true);
-    setError('');
-    setSuccess('');
 
     try {
       const response = await deletePhoto();
+
       if (response.success) {
-        setSuccess('Photo deleted successfully!');
+        setPhotoSuccess('Photo deleted successfully!');
 
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         if (photoUrl) URL.revokeObjectURL(photoUrl);
@@ -232,7 +266,7 @@ const Profile = () => {
         await loadProfile();
       }
     } catch (err) {
-      setError(err.message);
+      setPhotoError(err.message || 'Failed to delete photo');
     } finally {
       setUpdating(false);
     }
@@ -251,27 +285,26 @@ const Profile = () => {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-5xl font-extrabold text-[#0f172a] mb-3">Profile</h1>
-        <p className="text-xl text-[#64748b]">Manage your account information and security</p>
+        <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
+        <p className="text-lg text-[#64748b]">Manage your account information and security</p>
       </div>
 
-      {error && (
-        <div className="mb-6 bg-red-100 text-red-700 px-5 py-4 rounded-2xl border border-red-200 text-base">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-6 bg-green-100 text-green-700 px-5 py-4 rounded-2xl border border-green-200 text-base">
-          {success}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Left Column */}
         <div className="xl:col-span-1">
           <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
             <h2 className="text-2xl font-bold text-[#0f172a] mb-6">Profile Photo</h2>
+
+            {photoError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                {photoError}
+              </div>
+            )}
+
+            {photoSuccess && (
+              <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                {photoSuccess}
+              </div>
+            )}
 
             <div className="flex flex-col items-center">
               {previewUrl ? (
@@ -304,6 +337,7 @@ const Profile = () => {
               {selectedFile && (
                 <div className="flex gap-3 mt-6 w-full">
                   <button
+                    type="button"
                     onClick={handleUploadPhoto}
                     disabled={uploading}
                     className="flex-1 bg-[#2563EB] text-white py-3 rounded-2xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
@@ -312,10 +346,12 @@ const Profile = () => {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => {
                       if (previewUrl) URL.revokeObjectURL(previewUrl);
                       setSelectedFile(null);
                       setPreviewUrl(null);
+                      clearPhotoMessages();
                     }}
                     className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-gray-300 transition-colors"
                   >
@@ -326,6 +362,7 @@ const Profile = () => {
 
               {!selectedFile && photoUrl && (
                 <button
+                  type="button"
                   onClick={handleDeletePhoto}
                   className="mt-6 w-full bg-red-500 text-white py-3 rounded-2xl font-semibold hover:bg-red-600 transition-colors"
                 >
@@ -336,19 +373,33 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Right Column */}
         <div className="xl:col-span-2 space-y-8">
-          {/* Personal Info */}
           <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-[#0f172a]">Personal Information</h2>
               <button
-                onClick={() => setEditMode(!editMode)}
+                type="button"
+                onClick={() => {
+                  setEditMode(!editMode);
+                  clearProfileMessages();
+                }}
                 className="bg-[#2563EB] text-white px-5 py-3 rounded-2xl font-semibold hover:bg-blue-700 transition-colors"
               >
                 {editMode ? 'Cancel' : 'Edit Profile'}
               </button>
             </div>
+
+            {profileError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                {profileError}
+              </div>
+            )}
+
+            {profileSuccess && (
+              <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                {profileSuccess}
+              </div>
+            )}
 
             {editMode ? (
               <form onSubmit={handleUpdateProfile} className="space-y-5">
@@ -406,8 +457,8 @@ const Profile = () => {
                 </div>
 
                 <div className="bg-[#f8fafc] rounded-2xl p-5 border border-gray-100">
-                  <p className="text-sm text-gray-500 mb-1">Username</p>
-                  <p className="text-lg font-semibold text-[#0f172a]">{profile?.username || user?.username}</p>
+                  <p className="text-sm text-gray-500 mb-1">Email Address</p>
+                  <p className="text-lg font-semibold text-[#0f172a]">{profile?.email || user?.email}</p>
                 </div>
 
                 <div className="bg-[#f8fafc] rounded-2xl p-5 border border-gray-100">
@@ -434,17 +485,32 @@ const Profile = () => {
             )}
           </div>
 
-          {/* Security */}
           <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-[#0f172a]">Security</h2>
               <button
-                onClick={() => setPasswordMode(!passwordMode)}
+                type="button"
+                onClick={() => {
+                  setPasswordMode(!passwordMode);
+                  clearPasswordMessages();
+                }}
                 className="bg-[#2563EB] text-white px-5 py-3 rounded-2xl font-semibold hover:bg-blue-700 transition-colors"
               >
                 {passwordMode ? 'Cancel' : 'Change Password'}
               </button>
             </div>
+
+            {passwordError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                {passwordError}
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                {passwordSuccess}
+              </div>
+            )}
 
             {passwordMode ? (
               <form onSubmit={handleUpdatePassword} className="space-y-5">
