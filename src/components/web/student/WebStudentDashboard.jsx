@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, ArrowLeft, MapPin, Package } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, ArrowLeft, MapPin, Package, CheckCircle } from 'lucide-react';
 import { getAvailableItems, borrowItem } from '../../../api/borrowbox';
 
 const sampleCategories = [
@@ -12,6 +13,8 @@ const sampleCategories = [
 ];
 
 export function WebStudentDashboard() {
+  const navigate = useNavigate();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [items, setItems] = useState([]);
@@ -41,7 +44,6 @@ export function WebStudentDashboard() {
   const handleBorrow = async () => {
     try {
       await borrowItem(selectedItem.id, borrowDays);
-
       setShowBorrowModal(false);
       setShowSuccessModal(true);
       setAgreed(false);
@@ -182,24 +184,29 @@ export function WebStudentDashboard() {
         )}
 
         {showSuccessModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm text-center">
-              <h2 className="text-xl font-bold text-gray-900 mb-3">
-                Borrow Request Submitted
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-lg p-10 w-full max-w-xl text-center">
+              <div className="mx-auto mb-6 w-24 h-24 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle className="w-14 h-14 text-[#10B981]" />
+              </div>
+
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                Item Borrowed Successfully!
               </h2>
 
-              <p className="text-gray-600 mb-6">
-                Your borrow request was submitted successfully.
+              <p className="text-gray-600 text-lg mb-8">
+                Check 'My Borrows' to view your borrowed items and due dates.
               </p>
 
               <button
                 onClick={() => {
                   setShowSuccessModal(false);
                   setSelectedItem(null);
+                  navigate('/web/student/borrows');
                 }}
-                className="w-full bg-[#10B981] text-white py-3 rounded-lg font-semibold"
+                className="w-full bg-[#10B981] text-white py-4 rounded-xl font-bold text-lg hover:bg-green-700"
               >
-                OK
+                Go to My Borrows
               </button>
             </div>
           </div>
@@ -226,14 +233,14 @@ export function WebStudentDashboard() {
               placeholder="Search items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981]"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
             />
           </div>
 
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981]"
+            className="px-4 py-2 border border-gray-300 rounded-lg"
           >
             {sampleCategories.map((cat) => (
               <option key={cat.id} value={cat.id}>
@@ -249,10 +256,7 @@ export function WebStudentDashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-            >
+            <div key={item.id} className="bg-white rounded-xl border overflow-hidden">
               <img
                 src={item.image || 'https://via.placeholder.com/400x250'}
                 alt={item.name}
@@ -260,27 +264,15 @@ export function WebStudentDashboard() {
               />
 
               <div className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                    {item.category}
-                  </span>
-                </div>
-
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                  {item.description}
-                </p>
-
-                <p className="text-sm text-gray-500 mb-4">
-                  Available:{' '}
-                  <span className="font-semibold text-gray-900">
-                    {item.availableQuantity}/{item.totalQuantity}
-                  </span>
+                <h3 className="font-semibold">{item.name}</h3>
+                <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                <p className="text-sm mb-4">
+                  Available: {item.availableQuantity}/{item.totalQuantity}
                 </p>
 
                 <button
                   onClick={() => setSelectedItem(item)}
-                  className="w-full bg-[#10B981] text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                  className="w-full bg-[#10B981] text-white py-2 rounded-lg font-medium"
                 >
                   View Details
                 </button>
