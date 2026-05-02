@@ -47,6 +47,7 @@ export const deleteItem = async (id) => {
 export const borrowItem = async (itemId, notes = '') => {
   const res = await api.post('/borrows/borrow', {
     itemId,
+    quantity: 1,
     notes,
   });
   return res.data;
