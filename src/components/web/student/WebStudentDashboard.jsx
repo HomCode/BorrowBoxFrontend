@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, MapPin, Package, CheckCircle } from 'lucide-react';
+import { Search, ArrowLeft, MapPin, Package, CheckCircle, XCircle } from 'lucide-react';
 import { getAvailableItems, borrowItem } from '../../../api/borrowbox';
 
 const sampleCategories = [
@@ -23,6 +23,9 @@ export function WebStudentDashboard() {
 
   const [showBorrowModal, setShowBorrowModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showUnavailableModal, setShowUnavailableModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   const [borrowDays, setBorrowDays] = useState(7);
   const [agreed, setAgreed] = useState(false);
 
@@ -44,13 +47,20 @@ export function WebStudentDashboard() {
   const handleBorrow = async () => {
     try {
       await borrowItem(selectedItem.id, borrowDays);
+
       setShowBorrowModal(false);
       setShowSuccessModal(true);
       setAgreed(false);
       setBorrowDays(7);
       loadItems();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Failed to borrow item');
+      setShowBorrowModal(false);
+      setErrorMessage(
+        err.response?.data?.message ||
+          err.message ||
+          'Item is not available for borrowing.'
+      );
+      setShowUnavailableModal(true);
     }
   };
 
@@ -61,6 +71,8 @@ export function WebStudentDashboard() {
   });
 
   if (selectedItem) {
+    const isUnavailable = selectedItem.availableQuantity <= 0;
+
     return (
       <div className="p-8">
         <button
@@ -106,12 +118,24 @@ export function WebStudentDashboard() {
               </div>
             </div>
 
-            <button
-              onClick={() => setShowBorrowModal(true)}
-              className="w-full bg-[#10B981] text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
-            >
-              BORROW THIS ITEM
-            </button>
+            {isUnavailable ? (
+              <button
+                onClick={() => {
+                  setErrorMessage('This item is currently unavailable for borrowing.');
+                  setShowUnavailableModal(true);
+                }}
+                className="w-full bg-gray-300 text-gray-600 py-3 rounded-lg font-semibold"
+              >
+                CURRENTLY UNAVAILABLE
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowBorrowModal(true)}
+                className="w-full bg-[#10B981] text-white py-3 rounded-lg font-semibold hover:bg-green-700"
+              >
+                BORROW THIS ITEM
+              </button>
+            )}
           </div>
         </div>
 
@@ -204,9 +228,34 @@ export function WebStudentDashboard() {
                   setSelectedItem(null);
                   navigate('/web/student/borrows');
                 }}
-                className="w-full bg-[#10B981] text-white py-4 rounded-xl font-bold text-lg hover:bg-green-700"
+                className="w-full bg-[#10B981] text-white py-4 rounded-xl font-bold text-lg"
               >
                 Go to My Borrows
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showUnavailableModal && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-lg p-10 w-full max-w-xl text-center">
+              <div className="mx-auto mb-6 w-24 h-24 rounded-full bg-red-100 flex items-center justify-center">
+                <XCircle className="w-14 h-14 text-red-500" />
+              </div>
+
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                Item Unavailable
+              </h2>
+
+              <p className="text-gray-600 text-lg mb-8">
+                {errorMessage}
+              </p>
+
+              <button
+                onClick={() => setShowUnavailableModal(false)}
+                className="w-full bg-[#10B981] text-white py-4 rounded-xl font-bold text-lg"
+              >
+                OK
               </button>
             </div>
           </div>
