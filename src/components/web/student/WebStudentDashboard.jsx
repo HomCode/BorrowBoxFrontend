@@ -19,6 +19,7 @@ export function WebStudentDashboard() {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [showBorrowModal, setShowBorrowModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [borrowDays, setBorrowDays] = useState(7);
   const [agreed, setAgreed] = useState(false);
 
@@ -40,9 +41,9 @@ export function WebStudentDashboard() {
   const handleBorrow = async () => {
     try {
       await borrowItem(selectedItem.id, borrowDays);
-      alert('Borrow request submitted successfully!');
+
       setShowBorrowModal(false);
-      setSelectedItem(null);
+      setShowSuccessModal(true);
       setAgreed(false);
       setBorrowDays(7);
       loadItems();
@@ -176,6 +177,30 @@ export function WebStudentDashboard() {
                   Confirm Borrow
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm text-center">
+              <h2 className="text-xl font-bold text-gray-900 mb-3">
+                Borrow Request Submitted
+              </h2>
+
+              <p className="text-gray-600 mb-6">
+                Your borrow request was submitted successfully.
+              </p>
+
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setSelectedItem(null);
+                }}
+                className="w-full bg-[#10B981] text-white py-3 rounded-lg font-semibold"
+              >
+                OK
+              </button>
             </div>
           </div>
         )}
