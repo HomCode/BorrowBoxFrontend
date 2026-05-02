@@ -44,10 +44,11 @@ export const deleteItem = async (id) => {
 };
 
 // BORROWS
-export const borrowItem = async (itemId, notes = '') => {
+export const borrowItem = async (itemId, days = 7, notes = '') => {
   const res = await api.post('/borrows/borrow', {
     itemId,
     quantity: 1,
+    days,
     notes,
   });
   return res.data;
