@@ -18,6 +18,10 @@ export function WebStudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null);
 
+  const [showBorrowModal, setShowBorrowModal] = useState(false);
+  const [borrowDays, setBorrowDays] = useState(7);
+  const [agreed, setAgreed] = useState(false);
+
   useEffect(() => {
     loadItems();
   }, []);
@@ -35,9 +39,12 @@ export function WebStudentDashboard() {
 
   const handleBorrow = async () => {
     try {
-      await borrowItem(selectedItem.id, 7);
-      alert('Item borrowed!');
+      await borrowItem(selectedItem.id, borrowDays);
+      alert('Borrow request submitted successfully!');
+      setShowBorrowModal(false);
       setSelectedItem(null);
+      setAgreed(false);
+      setBorrowDays(7);
       loadItems();
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to borrow item');
@@ -97,13 +104,81 @@ export function WebStudentDashboard() {
             </div>
 
             <button
-              onClick={handleBorrow}
+              onClick={() => setShowBorrowModal(true)}
               className="w-full bg-[#10B981] text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
             >
               BORROW THIS ITEM
             </button>
           </div>
         </div>
+
+        {showBorrowModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Confirm Borrow Request
+              </h2>
+
+              <div className="flex gap-3 bg-gray-50 rounded-lg p-3 mb-5">
+                <img
+                  src={selectedItem.image || 'https://via.placeholder.com/100'}
+                  alt={selectedItem.name}
+                  className="w-16 h-16 object-cover rounded-lg"
+                />
+                <div>
+                  <p className="font-semibold text-gray-900">{selectedItem.name}</p>
+                  <p className="text-sm text-gray-500">{selectedItem.category}</p>
+                </div>
+              </div>
+
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Select Borrow Period
+              </p>
+
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                {[3, 7, 14].map((day) => (
+                  <button
+                    key={day}
+                    onClick={() => setBorrowDays(day)}
+                    className={`py-3 rounded-lg font-medium ${
+                      borrowDays === day
+                        ? 'bg-[#10B981] text-white'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {day} days
+                  </button>
+                ))}
+              </div>
+
+              <label className="flex gap-2 text-sm bg-blue-50 border border-blue-200 rounded-lg p-3 mb-5">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                />
+                <span>I agree to return this item on time and in good condition.</span>
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setShowBorrowModal(false)}
+                  className="py-3 border border-gray-300 rounded-lg font-medium"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleBorrow}
+                  disabled={!agreed}
+                  className="py-3 rounded-lg font-medium bg-[#10B981] text-white disabled:bg-gray-200 disabled:text-gray-500"
+                >
+                  Confirm Borrow
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
