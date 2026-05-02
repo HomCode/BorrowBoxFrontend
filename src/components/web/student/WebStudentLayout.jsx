@@ -78,12 +78,12 @@ export function WebStudentLayout({ children }) {
     user?.email?.split('@')[0] ||
     'Student';
 
-  const initials = displayName
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+  const nameParts = displayName.trim().split(' ').filter(Boolean);
+
+  const initials =
+  nameParts.length >= 2
+    ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+    : nameParts[0]?.[0]?.toUpperCase() || 'U';
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">

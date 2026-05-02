@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { getStudentBorrows, returnBorrow } from '../../../api/borrowbox';
 
 export function WebStudentBorrows() {
   const [borrows, setBorrows] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [activeTab, setActiveTab] = useState('current');
   const [selectedBorrow, setSelectedBorrow] = useState(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     loadBorrows();
@@ -16,200 +16,259 @@ export function WebStudentBorrows() {
 
   const loadBorrows = async () => {
     setLoading(true);
-    setError('');
-
     try {
       const res = await getStudentBorrows();
-
-      if (res.success) {
-        setBorrows(res.borrows);
-      } else {
-        setError(res.message || 'Failed to load borrows');
-      }
+      if (res.success) setBorrows(res.borrows || []);
     } catch (err) {
-      setError(err.message || 'Failed to load borrows');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReturnClick = (borrow) => {
-    setSelectedBorrow(borrow);
-    setShowReturnModal(true);
+  const currentBorrows = borrows.filter((b) => b.status === 'ACTIVE');
+  const historyBorrows = borrows.filter((b) => b.status !== 'ACTIVE');
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    return new Date(date).toISOString().split('T')[0];
   };
 
-  const handleReturnItem = async (condition) => {
+  const getItemName = (borrow) =>
+    borrow.itemName || borrow.item?.name || borrow.name || 'Unknown Item';
+
+  const getItemImage = (borrow) =>
+    borrow.itemImage || borrow.item?.image || 'https://via.placeholder.com/100';
+
+  const getItemLocation = (borrow) =>
+    borrow.itemLocation || borrow.item?.location || 'Campus';
+
+  const isOverdue = (dueDate) => {
+    if (!dueDate) return false;
+    return new Date(dueDate) < new Date();
+  };
+
+  const handleReturn = async () => {
     if (!selectedBorrow) return;
 
-    setLoading(true);
-    setError('');
-
     try {
-      await returnBorrow(selectedBorrow.id, condition);
-
-      setSuccess(`${selectedBorrow.itemName} returned successfully`);
+      await returnBorrow(selectedBorrow.id, 'Good');
       setShowReturnModal(false);
-      setSelectedBorrow(null);
-      loadBorrows();
-
-      setTimeout(() => setSuccess(''), 3000);
+      setShowSuccessModal(true);
+      await loadBorrows();
     } catch (err) {
-      setError(err.message || 'Failed to return item');
-    } finally {
-      setLoading(false);
+      console.error(err);
     }
   };
-
-  const getStatusBadge = (status) => {
-    if (status === 'ACTIVE') {
-      return (
-        <span className="px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full flex items-center gap-1 w-fit">
-          <Clock className="w-3 h-3" /> Active
-        </span>
-      );
-    }
-
-    return (
-      <span className="px-3 py-1 text-xs font-semibold bg-green-100 text-green-700 rounded-full flex items-center gap-1 w-fit">
-        <CheckCircle className="w-3 h-3" /> Returned
-      </span>
-    );
-  };
-
-  const getDaysRemaining = (dueDate) => {
-    const due = new Date(dueDate);
-    const today = new Date();
-    return Math.ceil((due - today) / (1000 * 60 * 60 * 24));
-  };
-
-  const isOverdue = (dueDate) => getDaysRemaining(dueDate) < 0;
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Borrows</h1>
-        <p className="text-gray-500">Manage your borrowed items and track return dates</p>
+    <div className="p-8 w-full">
+      <div className="mb-10">
+        <h1 className="text-4xl font-bold text-gray-900 mb-3">My Borrows</h1>
+        <p className="text-xl text-gray-500">Track your borrowed items and history</p>
       </div>
 
-      {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
-          {error}
-        </div>
-      )}
+      <div className="flex gap-8 border-b border-gray-200 mb-8 w-full">
+        <button
+          onClick={() => setActiveTab('current')}
+          className={`px-8 py-4 text-xl font-medium border-b-2 ${
+            activeTab === 'current'
+              ? 'text-[#10B981] border-[#10B981]'
+              : 'text-gray-500 border-transparent'
+          }`}
+        >
+          Currently Borrowed ({currentBorrows.length})
+        </button>
 
-      {success && (
-        <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl">
-          {success}
-        </div>
-      )}
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`px-8 py-4 text-xl font-medium border-b-2 ${
+            activeTab === 'history'
+              ? 'text-[#10B981] border-[#10B981]'
+              : 'text-gray-500 border-transparent'
+          }`}
+        >
+          Borrowing History ({historyBorrows.length})
+        </button>
+      </div>
 
-      {loading && !borrows.length ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500 mt-4">Loading your borrows...</p>
-        </div>
-      ) : borrows.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg">You haven't borrowed any items yet</p>
-          <p className="text-gray-400 text-sm mt-2">Browse available items in the dashboard</p>
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {borrows.map((borrow) => (
-            <div key={borrow.id} className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">{borrow.itemName}</h3>
-                    {getStatusBadge(borrow.status)}
-                  </div>
+      {loading ? (
+        <p className="text-center text-gray-500 py-12">Loading borrows...</p>
+      ) : activeTab === 'current' ? (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm w-full max-w-none">
+          <div className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr] px-8 py-5 bg-gray-50 text-gray-500 font-medium">
+            <p>ITEM</p>
+            <p>BORROW DATE</p>
+            <p>DUE DATE</p>
+            <p className="text-center">ACTIONS</p>
+          </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mt-3">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase">Serial Number</p>
-                      <p className="font-mono text-gray-900">{borrow.serialNumber || 'N/A'}</p>
-                    </div>
+          {currentBorrows.length === 0 ? (
+            <div className="p-12 text-center">
+              <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">No currently borrowed items</p>
+            </div>
+          ) : (
+            currentBorrows.map((borrow) => (
+              <div
+                key={borrow.id}
+                className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr] items-center px-8 py-6 border-t border-gray-200"
+              >
+                <div className="flex items-center gap-4">
+                  <img
+                    src={getItemImage(borrow)}
+                    alt={getItemName(borrow)}
+                    className="w-20 h-20 rounded-xl object-cover"
+                  />
 
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase">Borrow Date</p>
-                      <p className="text-gray-900">{new Date(borrow.borrowDate).toLocaleDateString()}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase">Due Date</p>
-                      <p className="text-gray-900">{new Date(borrow.dueDate).toLocaleDateString()}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase">Status</p>
-                      {borrow.status === 'ACTIVE' && (
-                        <p className={`font-semibold ${isOverdue(borrow.dueDate) ? 'text-red-600' : 'text-blue-600'}`}>
-                          {isOverdue(borrow.dueDate)
-                            ? 'Overdue'
-                            : `${getDaysRemaining(borrow.dueDate)} days left`}
-                        </p>
-                      )}
-
-                      {borrow.status === 'RETURNED' && (
-                        <p className="font-semibold text-green-600">Completed</p>
-                      )}
-                    </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      {getItemName(borrow)}
+                    </h3>
+                    <p className="text-gray-500">{getItemLocation(borrow)}</p>
                   </div>
                 </div>
 
-                {borrow.status === 'ACTIVE' && (
+                <p className="text-lg text-gray-900">{formatDate(borrow.borrowDate)}</p>
+
+                <p
+                  className={`text-lg ${
+                    isOverdue(borrow.dueDate) ? 'text-red-500' : 'text-gray-900'
+                  }`}
+                >
+                  {formatDate(borrow.dueDate)}
+                  {isOverdue(borrow.dueDate) && ' (Overdue)'}
+                </p>
+
+                <div className="flex justify-center">
                   <button
-                    onClick={() => handleReturnClick(borrow)}
-                    disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    onClick={() => {
+                      setSelectedBorrow(borrow);
+                      setShowReturnModal(true);
+                    }}
+                    className="bg-red-500 text-white px-7 py-3 rounded-xl font-bold hover:bg-red-600"
                   >
-                    <RotateCcw className="w-4 h-4 inline mr-2" />
-                    Return Item
+                    RETURN ITEM
                   </button>
-                )}
+                </div>
               </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm w-full max-w-none">
+          <div className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr] px-8 py-5 bg-gray-50 text-gray-500 font-medium">
+            <p>ITEM</p>
+            <p>BORROW DATE</p>
+            <p>RETURN DATE</p>
+            <p className="text-center">STATUS</p>
+          </div>
+
+          {historyBorrows.length === 0 ? (
+            <div className="p-12 text-center">
+              <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">No borrowing history yet</p>
             </div>
-          ))}
+          ) : (
+            historyBorrows.map((borrow) => {
+              const returnedLate =
+                borrow.returnDate &&
+                borrow.dueDate &&
+                new Date(borrow.returnDate) > new Date(borrow.dueDate);
+
+              return (
+                <div
+                  key={borrow.id}
+                  className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr] items-center px-8 py-6 border-t border-gray-200"
+                >
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={getItemImage(borrow)}
+                      alt={getItemName(borrow)}
+                      className="w-20 h-20 rounded-xl object-cover"
+                    />
+
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">
+                        {getItemName(borrow)}
+                      </h3>
+                      <p className="text-gray-500">{getItemLocation(borrow)}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-lg text-gray-900">{formatDate(borrow.borrowDate)}</p>
+                  <p className="text-lg text-gray-900">{formatDate(borrow.returnDate)}</p>
+
+                  <div className="flex justify-center">
+                    <span
+                      className={`px-4 py-2 rounded-full font-medium ${
+                        returnedLate
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {returnedLate ? 'Returned late' : 'Returned on time'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
       {showReturnModal && selectedBorrow && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Return Item</h2>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md text-center">
+            <Clock className="w-16 h-16 text-red-500 mx-auto mb-4" />
 
-            <p className="text-gray-600 mb-6">
-              Are you returning <strong>{selectedBorrow.itemName}</strong> in good condition?
+            <h2 className="text-2xl font-bold mb-3">Return Item?</h2>
+
+            <p className="text-gray-600 mb-8">
+              Are you sure you want to return{' '}
+              <strong>{getItemName(selectedBorrow)}</strong>?
             </p>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => handleReturnItem('Good')}
-                disabled={loading}
-                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-              >
-                Yes, in Good Condition
-              </button>
-
-              <button
-                onClick={() => handleReturnItem('Damaged')}
-                disabled={loading}
-                className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50"
-              >
-                Return as Damaged
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowReturnModal(false);
-                  setSelectedBorrow(null);
-                }}
-                disabled={loading}
-                className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded-lg font-medium hover:bg-gray-300 transition-colors disabled:opacity-50"
+                onClick={() => setShowReturnModal(false)}
+                className="py-3 border rounded-xl font-bold"
               >
                 Cancel
               </button>
+
+              <button
+                onClick={handleReturn}
+                className="py-3 bg-red-500 text-white rounded-xl font-bold"
+              >
+                Confirm Return
+              </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-10 w-full max-w-md text-center">
+            <CheckCircle className="w-20 h-20 text-[#10B981] mx-auto mb-5" />
+
+            <h2 className="text-2xl font-bold mb-3">Item Returned Successfully!</h2>
+
+            <p className="text-gray-600 mb-8">
+              Your item has been moved to borrowing history.
+            </p>
+
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                setSelectedBorrow(null);
+                setActiveTab('history');
+              }}
+              className="w-full bg-[#10B981] text-white py-3 rounded-xl font-bold"
+            >
+              View History
+            </button>
           </div>
         </div>
       )}

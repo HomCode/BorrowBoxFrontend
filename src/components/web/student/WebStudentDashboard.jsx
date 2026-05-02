@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, MapPin, Package, CheckCircle, XCircle } from 'lucide-react';
+import { Search, MapPin, Package, CheckCircle, XCircle } from 'lucide-react';
 import { getAvailableItems, borrowItem } from '../../../api/borrowbox';
 
 const sampleCategories = [
@@ -75,14 +75,6 @@ export function WebStudentDashboard() {
 
     return (
       <div className="p-8">
-        <button
-          onClick={() => setSelectedItem(null)}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Dashboard
-        </button>
-
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden grid grid-cols-1 md:grid-cols-2">
           <div className="p-8">
             <img
