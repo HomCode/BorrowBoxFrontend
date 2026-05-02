@@ -1,0 +1,19 @@
+# Deployment configuration for Render.com
+# This file tells Render how to build and run your app
+
+build:
+  builder: node
+
+  nodeBuilder:
+    buildCommand: npm install && npm run build
+
+  env:
+    NODE_VERSION: 18.17.1
+
+services:
+  - type: web
+    name: borrowbox-frontend
+    plan: free
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://borrowbox-backend-production.onrender.com/api

@@ -14,80 +14,112 @@ import { WebOfficerItems } from './components/web/officer/WebOfficerItems';
 import { WebOfficerTransactions } from './components/web/officer/WebOfficerTransactions';
 
 import Profile from './components/Profile';
+import { getCurrentUser, isAuthenticated } from './api/auth';
 import './App.css';
+
+function ProtectedRoute({ allowedRole, children }) {
+  if (!isAuthenticated()) {
+    return <Navigate to="/web/login" replace />;
+  }
+
+  const user = getCurrentUser();
+  const role = user?.role?.toLowerCase();
+
+  if (allowedRole && role !== allowedRole) {
+    if (role === 'student') return <Navigate to="/web/student/dashboard" replace />;
+    if (role === 'officer') return <Navigate to="/web/officer/dashboard" replace />;
+    return <Navigate to="/web/login" replace />;
+  }
+
+  return children;
+}
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Navigate to="/web/login" />} />
+        <Route path="/" element={<Navigate to="/web/login" replace />} />
         <Route path="/web/login" element={<WebLogin />} />
         <Route path="/web/register" element={<WebRegister />} />
 
         <Route
           path="/web/student/dashboard"
           element={
-            <WebStudentLayout>
-              <WebStudentDashboard />
-            </WebStudentLayout>
+            <ProtectedRoute allowedRole="student">
+              <WebStudentLayout>
+                <WebStudentDashboard />
+              </WebStudentLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/web/student/borrows"
           element={
-            <WebStudentLayout>
-              <WebStudentBorrows />
-            </WebStudentLayout>
+            <ProtectedRoute allowedRole="student">
+              <WebStudentLayout>
+                <WebStudentBorrows />
+              </WebStudentLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/web/student/profile"
           element={
-            <WebStudentLayout>
-              <Profile />
-            </WebStudentLayout>
+            <ProtectedRoute allowedRole="student">
+              <WebStudentLayout>
+                <Profile />
+              </WebStudentLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/web/officer/dashboard"
           element={
-            <WebOfficerLayout>
-              <WebOfficerDashboard />
-            </WebOfficerLayout>
+            <ProtectedRoute allowedRole="officer">
+              <WebOfficerLayout>
+                <WebOfficerDashboard />
+              </WebOfficerLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/web/officer/items"
           element={
-            <WebOfficerLayout>
-              <WebOfficerItems />
-            </WebOfficerLayout>
+            <ProtectedRoute allowedRole="officer">
+              <WebOfficerLayout>
+                <WebOfficerItems />
+              </WebOfficerLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/web/officer/transactions"
           element={
-            <WebOfficerLayout>
-              <WebOfficerTransactions />
-            </WebOfficerLayout>
+            <ProtectedRoute allowedRole="officer">
+              <WebOfficerLayout>
+                <WebOfficerTransactions />
+              </WebOfficerLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/web/officer/profile"
           element={
-            <WebOfficerLayout>
-              <Profile />
-            </WebOfficerLayout>
+            <ProtectedRoute allowedRole="officer">
+              <WebOfficerLayout>
+                <Profile />
+              </WebOfficerLayout>
+            </ProtectedRoute>
           }
         />
 
-        <Route path="*" element={<Navigate to="/web/login" />} />
+        <Route path="*" element={<Navigate to="/web/login" replace />} />
       </Routes>
     </Router>
   );

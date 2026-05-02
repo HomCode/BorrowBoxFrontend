@@ -54,7 +54,6 @@ const Profile = () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       if (photoUrl) URL.revokeObjectURL(photoUrl);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const clearPhotoMessages = () => {
