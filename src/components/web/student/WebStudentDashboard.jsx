@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Search, ArrowLeft, MapPin, Package } from 'lucide-react';
 import { getAvailableItems, borrowItem } from '../../../api/borrowbox';
 
 const sampleCategories = [
@@ -8,15 +7,16 @@ const sampleCategories = [
   { id: 'electronics', name: 'Electronics' },
   { id: 'tools', name: 'Tools' },
   { id: 'books', name: 'Books' },
+  { id: 'laboratory', name: 'Laboratory' },
+  { id: 'sports', name: 'Sports' },
 ];
 
 export function WebStudentDashboard() {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   useEffect(() => {
     loadItems();
@@ -25,9 +25,7 @@ export function WebStudentDashboard() {
   const loadItems = async () => {
     try {
       const res = await getAvailableItems();
-      if (res.success) {
-        setItems(res.items);
-      }
+      if (res.success) setItems(res.items);
     } catch (err) {
       console.error(err);
     } finally {
@@ -35,12 +33,80 @@ export function WebStudentDashboard() {
     }
   };
 
+  const handleBorrow = async () => {
+    try {
+      await borrowItem(selectedItem.id, 7);
+      alert('Item borrowed!');
+      setSelectedItem(null);
+      loadItems();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to borrow item');
+    }
+  };
+
   const filteredItems = items.filter((item) => {
     const matchesSearch = item.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === 'all' || item.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  if (selectedItem) {
+    return (
+      <div className="p-8">
+        <button
+          onClick={() => setSelectedItem(null)}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Dashboard
+        </button>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden grid grid-cols-1 md:grid-cols-2">
+          <div className="p-8">
+            <img
+              src={selectedItem.image || 'https://via.placeholder.com/600x400'}
+              alt={selectedItem.name}
+              className="w-full h-80 object-cover rounded-lg"
+            />
+          </div>
+
+          <div className="p-8">
+            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">
+              {selectedItem.category}
+            </span>
+
+            <h1 className="text-3xl font-bold text-gray-900 mt-4 mb-4">
+              {selectedItem.name}
+            </h1>
+
+            <p className="text-sm text-gray-500 mb-1">Description</p>
+            <p className="text-gray-700 mb-6">{selectedItem.description}</p>
+
+            <p className="text-sm text-gray-500 mb-2">Details</p>
+
+            <div className="space-y-2 text-gray-700 mb-8">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-gray-400" />
+                {selectedItem.location || 'Campus'}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-gray-400" />
+                Available: {selectedItem.availableQuantity} of {selectedItem.totalQuantity}
+              </div>
+            </div>
+
+            <button
+              onClick={handleBorrow}
+              className="w-full bg-[#10B981] text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+            >
+              BORROW THIS ITEM
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
@@ -53,17 +119,15 @@ export function WebStudentDashboard() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
         <div className="flex gap-4 items-center">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search items..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981]"
-              />
-            </div>
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search items..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981]"
+            />
           </div>
 
           <select
@@ -81,9 +145,7 @@ export function WebStudentDashboard() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">Loading items...</p>
-        </div>
+        <p className="text-center text-gray-500 py-12">Loading items...</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map((item) => (
@@ -109,40 +171,22 @@ export function WebStudentDashboard() {
                   {item.description}
                 </p>
 
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm text-gray-500">
-                    Available:{' '}
-                    <span className="font-semibold text-gray-900">
-                      {item.availableQuantity}/{item.totalQuantity}
-                    </span>
+                <p className="text-sm text-gray-500 mb-4">
+                  Available:{' '}
+                  <span className="font-semibold text-gray-900">
+                    {item.availableQuantity}/{item.totalQuantity}
                   </span>
-                </div>
+                </p>
 
                 <button
-                  onClick={async () => {
-                    try {
-                      await borrowItem(item.id);
-                      alert('Item borrowed!');
-                      loadItems();
-                    } catch (err) {
-                      alert(err.message || 'Failed to borrow item');
-                    }
-                  }}
+                  onClick={() => setSelectedItem(item)}
                   className="w-full bg-[#10B981] text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors"
                 >
-                  Borrow Item
+                  View Details
                 </button>
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {!loading && filteredItems.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">
-            No items found matching your criteria
-          </p>
         </div>
       )}
     </div>
