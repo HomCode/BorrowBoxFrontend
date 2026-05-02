@@ -113,7 +113,7 @@ export function WebStudentDashboard() {
                   <span className="text-sm text-gray-500">
                     Available:{' '}
                     <span className="font-semibold text-gray-900">
-                      {item.available}/{item.quantity}
+                      {item.availableQuantity}/{item.totalQuantity}
                     </span>
                   </span>
                 </div>

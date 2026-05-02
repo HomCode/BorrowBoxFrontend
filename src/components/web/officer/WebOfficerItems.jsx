@@ -284,8 +284,8 @@ export function WebOfficerItems() {
             <p><strong>Description:</strong> {viewingItem.description}</p>
             <p><strong>Category:</strong> {viewingItem.category}</p>
             <p><strong>Serial #:</strong> {viewingItem.serialNumber || 'N/A'}</p>
-            <p><strong>Total:</strong> {viewingItem.quantity}</p>
-            <p><strong>Available:</strong> {viewingItem.available}</p>
+            <p><strong>Total:</strong> {viewingItem.totalQuantity}</p>
+            <p><strong>Available:</strong> {viewingItem.availableQuantity}</p>
 
             <button
               onClick={() => setShowViewModal(false)}
