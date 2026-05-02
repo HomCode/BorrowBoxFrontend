@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import { getStudentBorrows, returnBorrow } from '../../../api/borrowbox';
 
 export function WebStudentBorrows() {
   const [borrows, setBorrows] = useState([]);
@@ -9,42 +10,6 @@ export function WebStudentBorrows() {
   const [selectedBorrow, setSelectedBorrow] = useState(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
 
-  const sampleBorrows = [
-    {
-      id: '1',
-      itemId: '1',
-      itemName: 'Laptop',
-      category: 'electronics',
-      borrowDate: '2026-02-15',
-      dueDate: '2026-03-15',
-      status: 'ACTIVE',
-      condition: 'Good',
-      serialNumber: 'LAP-001'
-    },
-    {
-      id: '2',
-      itemId: '3',
-      itemName: 'Tool Kit',
-      category: 'tools',
-      borrowDate: '2026-03-01',
-      dueDate: '2026-03-10',
-      status: 'ACTIVE',
-      condition: 'Good',
-      serialNumber: 'TOOL-001'
-    },
-    {
-      id: '3',
-      itemId: '2',
-      itemName: 'Projector',
-      category: 'electronics',
-      borrowDate: '2026-02-20',
-      dueDate: '2026-02-28',
-      status: 'RETURNED',
-      condition: 'Good',
-      serialNumber: 'PROJ-001'
-    },
-  ];
-
   useEffect(() => {
     loadBorrows();
   }, []);
@@ -52,14 +17,18 @@ export function WebStudentBorrows() {
   const loadBorrows = async () => {
     setLoading(true);
     setError('');
+
     try {
-      // Simulate API call - replace with actual API endpoint
-      setTimeout(() => {
-        setBorrows(sampleBorrows);
-        setLoading(false);
-      }, 500);
+      const res = await getStudentBorrows();
+
+      if (res.success) {
+        setBorrows(res.borrows);
+      } else {
+        setError(res.message || 'Failed to load borrows');
+      }
     } catch (err) {
-      setError('Failed to load borrows');
+      setError(err.message || 'Failed to load borrows');
+    } finally {
       setLoading(false);
     }
   };
@@ -73,36 +42,44 @@ export function WebStudentBorrows() {
     if (!selectedBorrow) return;
 
     setLoading(true);
+    setError('');
+
     try {
-      // Simulate API call - replace with actual API endpoint
-      const updatedBorrows = borrows.map(b =>
-        b.id === selectedBorrow.id
-          ? { ...b, status: 'RETURNED', condition }
-          : b
-      );
-      setBorrows(updatedBorrows);
+      await returnBorrow(selectedBorrow.id, condition);
+
       setSuccess(`${selectedBorrow.itemName} returned successfully`);
       setShowReturnModal(false);
       setSelectedBorrow(null);
+      loadBorrows();
+
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Failed to return item');
+      setError(err.message || 'Failed to return item');
     } finally {
       setLoading(false);
     }
   };
 
   const getStatusBadge = (status) => {
-    if (status === 'ACTIVE')
-      return <span className="px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> Active</span>;
-    return <span className="px-3 py-1 text-xs font-semibold bg-green-100 text-green-700 rounded-full flex items-center gap-1 w-fit"><CheckCircle className="w-3 h-3" /> Returned</span>;
+    if (status === 'ACTIVE') {
+      return (
+        <span className="px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full flex items-center gap-1 w-fit">
+          <Clock className="w-3 h-3" /> Active
+        </span>
+      );
+    }
+
+    return (
+      <span className="px-3 py-1 text-xs font-semibold bg-green-100 text-green-700 rounded-full flex items-center gap-1 w-fit">
+        <CheckCircle className="w-3 h-3" /> Returned
+      </span>
+    );
   };
 
   const getDaysRemaining = (dueDate) => {
     const due = new Date(dueDate);
     const today = new Date();
-    const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
-    return diff;
+    return Math.ceil((due - today) / (1000 * 60 * 60 * 24));
   };
 
   const isOverdue = (dueDate) => getDaysRemaining(dueDate) < 0;
@@ -128,9 +105,6 @@ export function WebStudentBorrows() {
 
       {loading && !borrows.length ? (
         <div className="text-center py-12">
-          <div className="inline-block">
-            <div className="w-8 h-8 border-4 border-blue-300 border-t-[#2563EB] rounded-full animate-spin"></div>
-          </div>
           <p className="text-gray-500 mt-4">Loading your borrows...</p>
         </div>
       ) : borrows.length === 0 ? (
@@ -149,32 +123,40 @@ export function WebStudentBorrows() {
                     <h3 className="text-lg font-bold text-gray-900">{borrow.itemName}</h3>
                     {getStatusBadge(borrow.status)}
                   </div>
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mt-3">
                     <div>
                       <p className="text-xs text-gray-500 uppercase">Serial Number</p>
-                      <p className="font-mono text-gray-900">{borrow.serialNumber}</p>
+                      <p className="font-mono text-gray-900">{borrow.serialNumber || 'N/A'}</p>
                     </div>
+
                     <div>
                       <p className="text-xs text-gray-500 uppercase">Borrow Date</p>
                       <p className="text-gray-900">{new Date(borrow.borrowDate).toLocaleDateString()}</p>
                     </div>
+
                     <div>
                       <p className="text-xs text-gray-500 uppercase">Due Date</p>
                       <p className="text-gray-900">{new Date(borrow.dueDate).toLocaleDateString()}</p>
                     </div>
+
                     <div>
                       <p className="text-xs text-gray-500 uppercase">Status</p>
                       {borrow.status === 'ACTIVE' && (
                         <p className={`font-semibold ${isOverdue(borrow.dueDate) ? 'text-red-600' : 'text-blue-600'}`}>
-                          {isOverdue(borrow.dueDate) ? 'Overdue' : `${getDaysRemaining(borrow.dueDate)} days left`}
+                          {isOverdue(borrow.dueDate)
+                            ? 'Overdue'
+                            : `${getDaysRemaining(borrow.dueDate)} days left`}
                         </p>
                       )}
+
                       {borrow.status === 'RETURNED' && (
                         <p className="font-semibold text-green-600">Completed</p>
                       )}
                     </div>
                   </div>
                 </div>
+
                 {borrow.status === 'ACTIVE' && (
                   <button
                     onClick={() => handleReturnClick(borrow)}
@@ -195,9 +177,11 @@ export function WebStudentBorrows() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Return Item</h2>
+
             <p className="text-gray-600 mb-6">
               Are you returning <strong>{selectedBorrow.itemName}</strong> in good condition?
             </p>
+
             <div className="space-y-3">
               <button
                 onClick={() => handleReturnItem('Good')}
@@ -206,6 +190,7 @@ export function WebStudentBorrows() {
               >
                 Yes, in Good Condition
               </button>
+
               <button
                 onClick={() => handleReturnItem('Damaged')}
                 disabled={loading}
@@ -213,6 +198,7 @@ export function WebStudentBorrows() {
               >
                 Return as Damaged
               </button>
+
               <button
                 onClick={() => {
                   setShowReturnModal(false);
