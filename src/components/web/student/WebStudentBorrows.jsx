@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { getStudentBorrows, returnBorrow } from '../../../api/borrowbox';
+import {
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Image as ImageIcon
+} from 'lucide-react';
+import {
+  getStudentBorrows,
+  returnBorrow,
+  getItemPhotoBlobUrl
+} from '../../../api/borrowbox';
 
 export function WebStudentBorrows() {
   const [borrows, setBorrows] = useState([]);
@@ -10,17 +19,21 @@ export function WebStudentBorrows() {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  const [returnLoading, setReturnLoading] = useState(false);
+  const [returnError, setReturnError] = useState('');
+
   useEffect(() => {
     loadBorrows();
   }, []);
 
   const loadBorrows = async () => {
     setLoading(true);
+
     try {
       const res = await getStudentBorrows();
       if (res.success) setBorrows(res.borrows || []);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load borrows:', err);
     } finally {
       setLoading(false);
     }
@@ -31,33 +44,65 @@ export function WebStudentBorrows() {
 
   const formatDate = (date) => {
     if (!date) return 'N/A';
-    return new Date(date).toISOString().split('T')[0];
+
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) return 'N/A';
+
+    return parsedDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
   const getItemName = (borrow) =>
     borrow.itemName || borrow.item?.name || borrow.name || 'Unknown Item';
 
-  const getItemImage = (borrow) =>
-    borrow.itemImage || borrow.item?.image || 'https://via.placeholder.com/100';
-
   const getItemLocation = (borrow) =>
-    borrow.itemLocation || borrow.item?.location || 'Campus';
+    borrow.itemLocation || borrow.item?.location || borrow.location || 'Campus';
 
   const isOverdue = (dueDate) => {
     if (!dueDate) return false;
     return new Date(dueDate) < new Date();
   };
 
+  const openReturnModal = (borrow) => {
+    setSelectedBorrow(borrow);
+    setReturnError('');
+    setShowReturnModal(true);
+  };
+
+  const closeReturnModal = () => {
+    if (returnLoading) return;
+
+    setShowReturnModal(false);
+    setReturnError('');
+  };
+
   const handleReturn = async () => {
-    if (!selectedBorrow) return;
+    if (!selectedBorrow || returnLoading) return;
+
+    setReturnLoading(true);
+    setReturnError('');
 
     try {
       await returnBorrow(selectedBorrow.id, 'Good');
+
       setShowReturnModal(false);
       setShowSuccessModal(true);
+
       await loadBorrows();
     } catch (err) {
-      console.error(err);
+      console.error('Failed to return item:', err);
+
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to return item. Please try again.';
+
+      setReturnError(message);
+    } finally {
+      setReturnLoading(false);
     }
   };
 
@@ -70,6 +115,7 @@ export function WebStudentBorrows() {
 
       <div className="flex gap-8 border-b border-gray-200 mb-8 w-full">
         <button
+          type="button"
           onClick={() => setActiveTab('current')}
           className={`px-8 py-4 text-xl font-medium border-b-2 ${
             activeTab === 'current'
@@ -81,6 +127,7 @@ export function WebStudentBorrows() {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('history')}
           className={`px-8 py-4 text-xl font-medium border-b-2 ${
             activeTab === 'history'
@@ -115,10 +162,10 @@ export function WebStudentBorrows() {
                 className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr] items-center px-8 py-6 border-t border-gray-200"
               >
                 <div className="flex items-center gap-4">
-                  <img
-                    src={getItemImage(borrow)}
-                    alt={getItemName(borrow)}
-                    className="w-20 h-20 rounded-xl object-cover"
+                  <BorrowItemImage
+                    itemId={borrow.itemId}
+                    itemName={getItemName(borrow)}
+                    className="w-20 h-20"
                   />
 
                   <div>
@@ -129,7 +176,9 @@ export function WebStudentBorrows() {
                   </div>
                 </div>
 
-                <p className="text-lg text-gray-900">{formatDate(borrow.borrowDate)}</p>
+                <p className="text-lg text-gray-900">
+                  {formatDate(borrow.borrowDate)}
+                </p>
 
                 <p
                   className={`text-lg ${
@@ -142,10 +191,8 @@ export function WebStudentBorrows() {
 
                 <div className="flex justify-center">
                   <button
-                    onClick={() => {
-                      setSelectedBorrow(borrow);
-                      setShowReturnModal(true);
-                    }}
+                    type="button"
+                    onClick={() => openReturnModal(borrow)}
                     className="bg-red-500 text-white px-7 py-3 rounded-xl font-bold hover:bg-red-600"
                   >
                     RETURN ITEM
@@ -182,10 +229,10 @@ export function WebStudentBorrows() {
                   className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr] items-center px-8 py-6 border-t border-gray-200"
                 >
                   <div className="flex items-center gap-4">
-                    <img
-                      src={getItemImage(borrow)}
-                      alt={getItemName(borrow)}
-                      className="w-20 h-20 rounded-xl object-cover"
+                    <BorrowItemImage
+                      itemId={borrow.itemId}
+                      itemName={getItemName(borrow)}
+                      className="w-20 h-20"
                     />
 
                     <div>
@@ -196,8 +243,13 @@ export function WebStudentBorrows() {
                     </div>
                   </div>
 
-                  <p className="text-lg text-gray-900">{formatDate(borrow.borrowDate)}</p>
-                  <p className="text-lg text-gray-900">{formatDate(borrow.returnDate)}</p>
+                  <p className="text-lg text-gray-900">
+                    {formatDate(borrow.borrowDate)}
+                  </p>
+
+                  <p className="text-lg text-gray-900">
+                    {formatDate(borrow.returnDate)}
+                  </p>
 
                   <div className="flex justify-center">
                     <span
@@ -224,24 +276,34 @@ export function WebStudentBorrows() {
 
             <h2 className="text-2xl font-bold mb-3">Return Item?</h2>
 
-            <p className="text-gray-600 mb-8">
+            <p className="text-gray-600 mb-5">
               Are you sure you want to return{' '}
               <strong>{getItemName(selectedBorrow)}</strong>?
             </p>
 
+            {returnError && (
+              <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 text-left">
+                {returnError}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setShowReturnModal(false)}
-                className="py-3 border rounded-xl font-bold"
+                type="button"
+                onClick={closeReturnModal}
+                disabled={returnLoading}
+                className="py-3 border rounded-xl font-bold disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
 
               <button
+                type="button"
                 onClick={handleReturn}
-                className="py-3 bg-red-500 text-white rounded-xl font-bold"
+                disabled={returnLoading}
+                className="py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Confirm Return
+                {returnLoading ? 'Returning...' : 'Confirm Return'}
               </button>
             </div>
           </div>
@@ -260,9 +322,11 @@ export function WebStudentBorrows() {
             </p>
 
             <button
+              type="button"
               onClick={() => {
                 setShowSuccessModal(false);
                 setSelectedBorrow(null);
+                setReturnError('');
                 setActiveTab('history');
               }}
               className="w-full bg-[#10B981] text-white py-3 rounded-xl font-bold"
@@ -272,6 +336,56 @@ export function WebStudentBorrows() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BorrowItemImage({ itemId, itemName, className = 'w-20 h-20' }) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    let currentUrl = null;
+
+    const loadImage = async () => {
+      setUrl(null);
+
+      if (!itemId) return;
+
+      const blobUrl = await getItemPhotoBlobUrl(itemId);
+
+      if (active && blobUrl) {
+        currentUrl = blobUrl;
+        setUrl(blobUrl);
+      }
+    };
+
+    loadImage();
+
+    return () => {
+      active = false;
+
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+    };
+  }, [itemId]);
+
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={itemName || 'Item'}
+        className={`${className} rounded-xl object-cover bg-gray-100`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${className} rounded-xl bg-gray-100 flex items-center justify-center text-gray-400`}
+    >
+      <ImageIcon className="w-7 h-7" />
     </div>
   );
 }

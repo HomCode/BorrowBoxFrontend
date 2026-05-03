@@ -1,15 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Package, CheckCircle, XCircle } from 'lucide-react';
-import { getAvailableItems, borrowItem } from '../../../api/borrowbox';
+import {
+  Search,
+  MapPin,
+  Package,
+  CheckCircle,
+  XCircle,
+  Image as ImageIcon
+} from 'lucide-react';
+import {
+  getAvailableItems,
+  borrowItem,
+  getItemPhotoBlobUrl
+} from '../../../api/borrowbox';
 
 const sampleCategories = [
   { id: 'all', name: 'All Categories' },
-  { id: 'electronics', name: 'Electronics' },
-  { id: 'tools', name: 'Tools' },
-  { id: 'books', name: 'Books' },
-  { id: 'laboratory', name: 'Laboratory' },
-  { id: 'sports', name: 'Sports' },
+  { id: 'Electronics', name: 'Electronics' },
+  { id: 'Tools', name: 'Tools' },
+  { id: 'Books', name: 'Books' },
+  { id: 'Laboratory', name: 'Laboratory' },
+  { id: 'Sports', name: 'Sports' },
+  { id: 'Other', name: 'Other' },
 ];
 
 export function WebStudentDashboard() {
@@ -36,12 +48,16 @@ export function WebStudentDashboard() {
   const loadItems = async () => {
     try {
       const res = await getAvailableItems();
-      if (res.success) setItems(res.items);
+      if (res.success) setItems(res.items || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const normalizeCategory = (value) => {
+    return String(value || '').trim().toLowerCase();
   };
 
   const handleBorrow = async () => {
@@ -65,8 +81,18 @@ export function WebStudentDashboard() {
   };
 
   const filteredItems = items.filter((item) => {
-    const matchesSearch = item.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+    const search = searchQuery.toLowerCase();
+
+    const matchesSearch =
+      String(item.name || '').toLowerCase().includes(search) ||
+      String(item.description || '').toLowerCase().includes(search) ||
+      String(item.category || '').toLowerCase().includes(search) ||
+      String(item.location || '').toLowerCase().includes(search);
+
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      normalizeCategory(item.category) === normalizeCategory(selectedCategory);
+
     return matchesSearch && matchesCategory;
   });
 
@@ -75,12 +101,20 @@ export function WebStudentDashboard() {
 
     return (
       <div className="p-8">
+        <button
+          onClick={() => setSelectedItem(null)}
+          className="mb-6 text-gray-600 hover:text-gray-900 font-medium"
+        >
+          ← Back to items
+        </button>
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden grid grid-cols-1 md:grid-cols-2">
           <div className="p-8">
-            <img
-              src={selectedItem.image || 'https://via.placeholder.com/600x400'}
-              alt={selectedItem.name}
-              className="w-full h-80 object-cover rounded-lg"
+            <StudentItemImage
+              itemId={selectedItem.id}
+              itemName={selectedItem.name}
+              className="w-full h-80"
+              large
             />
           </div>
 
@@ -94,7 +128,9 @@ export function WebStudentDashboard() {
             </h1>
 
             <p className="text-sm text-gray-500 mb-1">Description</p>
-            <p className="text-gray-700 mb-6">{selectedItem.description}</p>
+            <p className="text-gray-700 mb-6">
+              {selectedItem.description || 'No description provided.'}
+            </p>
 
             <p className="text-sm text-gray-500 mb-2">Details</p>
 
@@ -139,11 +175,12 @@ export function WebStudentDashboard() {
               </h2>
 
               <div className="flex gap-3 bg-gray-50 rounded-lg p-3 mb-5">
-                <img
-                  src={selectedItem.image || 'https://via.placeholder.com/100'}
-                  alt={selectedItem.name}
-                  className="w-16 h-16 object-cover rounded-lg"
+                <StudentItemImage
+                  itemId={selectedItem.id}
+                  itemName={selectedItem.name}
+                  className="w-16 h-16"
                 />
+
                 <div>
                   <p className="font-semibold text-gray-900">{selectedItem.name}</p>
                   <p className="text-sm text-gray-500">{selectedItem.category}</p>
@@ -294,19 +331,24 @@ export function WebStudentDashboard() {
 
       {loading ? (
         <p className="text-center text-gray-500 py-12">Loading items...</p>
+      ) : filteredItems.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <p className="text-gray-500 text-lg">No available items found</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map((item) => (
-            <div key={item.id} className="bg-white rounded-xl border overflow-hidden">
-              <img
-                src={item.image || 'https://via.placeholder.com/400x250'}
-                alt={item.name}
-                className="w-full h-48 object-cover"
+            <div key={item.id} className="bg-white rounded-xl border overflow-hidden shadow-sm">
+              <StudentItemImage
+                itemId={item.id}
+                itemName={item.name}
+                className="w-full h-48"
               />
 
               <div className="p-4">
-                <h3 className="font-semibold">{item.name}</h3>
+                <h3 className="font-semibold text-gray-900">{item.name}</h3>
                 <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                <p className="text-sm text-gray-500 mb-1">{item.category}</p>
                 <p className="text-sm mb-4">
                   Available: {item.availableQuantity}/{item.totalQuantity}
                 </p>
@@ -322,6 +364,53 @@ export function WebStudentDashboard() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function StudentItemImage({ itemId, itemName, className = 'w-24 h-24' }) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    let currentUrl = null;
+
+    const loadImage = async () => {
+      setUrl(null);
+
+      if (!itemId) return;
+
+      const blobUrl = await getItemPhotoBlobUrl(itemId);
+
+      if (active && blobUrl) {
+        currentUrl = blobUrl;
+        setUrl(blobUrl);
+      }
+    };
+
+    loadImage();
+
+    return () => {
+      active = false;
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+    };
+  }, [itemId]);
+
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={itemName || 'Item'}
+        className={`${className} object-cover bg-gray-100`}
+      />
+    );
+  }
+
+  return (
+    <div className={`${className} bg-gray-100 flex items-center justify-center text-gray-400`}>
+      <ImageIcon className="w-10 h-10" />
     </div>
   );
 }

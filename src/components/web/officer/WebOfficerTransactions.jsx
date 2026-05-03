@@ -1,16 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Eye, X, Download } from 'lucide-react';
-import { getAllTransactions } from '../../../api/borrowbox';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Download, Image as ImageIcon } from 'lucide-react';
+import { getAllBorrows, getItemPhotoBlobUrl } from '../../../api/borrowbox';
 
 export function WebOfficerTransactions() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [viewingTransaction, setViewingTransaction] = useState(null);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
     loadTransactions();
@@ -18,261 +13,381 @@ export function WebOfficerTransactions() {
 
   const loadTransactions = async () => {
     setLoading(true);
-    setError('');
 
     try {
-      const res = await getAllTransactions();
-      if (res.success) setTransactions(res.transactions);
-      else setError(res.message || 'Failed to load transactions');
+      const res = await getAllBorrows();
+      const borrows = res?.borrows || [];
+
+      const normalized = borrows.map((borrow, index) =>
+        normalizeBorrowTransaction(borrow, index)
+      );
+
+      setTransactions(normalized);
     } catch (err) {
-      setError(err.message || 'Failed to load transactions');
+      console.error('Failed to load transactions:', err);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredTransactions = transactions.filter((t) => {
-    const matchesSearch =
-      t.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.itemName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.studentId?.toLowerCase().includes(searchQuery.toLowerCase());
+  const totalTransactions = transactions.length;
 
-    const matchesStatus = selectedStatus === 'all' || t.status === selectedStatus;
-
-    let matchesDateRange = true;
-    if (dateRange.start) matchesDateRange = matchesDateRange && new Date(t.borrowDate) >= new Date(dateRange.start);
-    if (dateRange.end) matchesDateRange = matchesDateRange && new Date(t.borrowDate) <= new Date(dateRange.end);
-
-    return matchesSearch && matchesStatus && matchesDateRange;
-  });
-
-  const getStatusBadge = (status) => {
-    const config = {
-      ACTIVE: 'bg-blue-100 text-blue-700',
-      RETURNED: 'bg-green-100 text-green-700',
-      OVERDUE: 'bg-red-100 text-red-700',
-      DAMAGED: 'bg-orange-100 text-orange-700',
-    };
-
-    return (
-      <span className={`px-3 py-1 text-xs font-semibold rounded-full ${config[status] || config.ACTIVE}`}>
-        {status || 'ACTIVE'}
-      </span>
+  const activeBorrows = useMemo(() => {
+    return transactions.filter((tx) =>
+      ['ACTIVE', 'BORROWED', 'APPROVED', 'PENDING'].includes(tx.rawStatus)
     );
-  };
+  }, [transactions]);
 
-  const handleExport = () => {
-    const csv = [
-      ['ID', 'Student Name', 'Student ID', 'Item', 'Serial #', 'Borrow Date', 'Due Date', 'Return Date', 'Status'],
-      ...filteredTransactions.map((t) => [
-        t.id,
-        t.studentName,
-        t.studentId,
-        t.itemName,
-        t.serialNumber,
-        t.borrowDate,
-        t.dueDate,
-        t.returnDate || 'N/A',
-        t.status,
-      ]),
+  const returnedTransactions = useMemo(() => {
+    return transactions.filter((tx) => tx.rawStatus === 'RETURNED');
+  }, [transactions]);
+
+  const returnRate = totalTransactions
+    ? Math.round((returnedTransactions.length / totalTransactions) * 100)
+    : 0;
+
+  const displayedTransactions = useMemo(() => {
+    if (activeTab === 'borrowed') return activeBorrows;
+    if (activeTab === 'returned') return returnedTransactions;
+    return transactions;
+  }, [activeTab, transactions, activeBorrows, returnedTransactions]);
+
+  const exportToCSV = () => {
+    const headers = [
+      'Student Name',
+      'Student ID',
+      'Item',
+      'Serial Number',
+      'Borrow Date',
+      'Due Date',
+      'Return Date',
+      'Status',
     ];
 
-    const csvContent = csv.map((row) => row.map((cell) => `"${cell || ''}"`).join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const rows = displayedTransactions.map((tx) => [
+      csvEscape(cleanText(tx.studentName)),
+      csvEscape(cleanText(tx.studentIdentifier)),
+      csvEscape(cleanText(tx.itemName)),
+      csvEscape(cleanText(tx.serialNumber)),
+      csvEscape(formatReadableDate(tx.borrowDate)),
+      csvEscape(formatReadableDate(tx.dueDate)),
+      csvEscape(formatReadableDate(tx.returnDate)),
+      csvEscape(cleanText(tx.displayStatus)),
+    ]);
 
-    a.href = url;
-    a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], {
+      type: 'text/csv;charset=utf-8;',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.setAttribute(
+      'download',
+      `borrowbox-transactions-${new Date().toISOString().split('T')[0]}.csv`
+    );
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
     URL.revokeObjectURL(url);
-  };
-
-  const stats = {
-    total: transactions.length,
-    active: transactions.filter((t) => t.status === 'ACTIVE').length,
-    returned: transactions.filter((t) => t.status === 'RETURNED').length,
-    overdue: transactions.filter((t) => t.status === 'OVERDUE').length,
   };
 
   return (
     <div className="p-8">
-      <div className="mb-8 flex justify-between items-center">
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Transactions</h1>
-          <p className="text-gray-500">Track all borrowing and return transactions</p>
+          <h1 className="text-3xl font-bold text-[#0F172A] mb-2">
+            All Borrowing Transactions
+          </h1>
+          <p className="text-[#64748B] text-lg">
+            Monitor and track all borrowing activity
+          </p>
         </div>
 
         <button
-          onClick={handleExport}
-          disabled={filteredTransactions.length === 0}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+          type="button"
+          onClick={exportToCSV}
+          className="inline-flex items-center gap-2 bg-[#16A34A] hover:bg-green-700 text-white px-5 py-3 rounded-xl font-semibold transition-colors"
         >
           <Download className="w-5 h-5" />
           Export CSV
         </button>
       </div>
 
-      {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <p className="text-gray-500 text-sm mb-1">Total Transactions</p>
-          <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <p className="text-gray-500 text-sm mb-1">Active Borrows</p>
-          <p className="text-2xl font-bold text-blue-600">{stats.active}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <p className="text-gray-500 text-sm mb-1">Returned</p>
-          <p className="text-2xl font-bold text-green-600">{stats.returned}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <p className="text-gray-500 text-sm mb-1">Overdue</p>
-          <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <SummaryCard label="Total Transactions" value={totalTransactions} />
+        <SummaryCard label="Active Borrows" value={activeBorrows.length} blue />
+        <SummaryCard label="Return Rate" value={`${returnRate}%`} green />
       </div>
 
-      <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by student name, item, or ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="all">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="RETURNED">Returned</option>
-            <option value="OVERDUE">Overdue</option>
-            <option value="DAMAGED">Damaged</option>
-          </select>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200">
-          <input
-            type="date"
-            value={dateRange.start}
-            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-8">
+        <div className="flex flex-wrap gap-3">
+          <TabButton
+            label="All Transactions"
+            active={activeTab === 'all'}
+            onClick={() => setActiveTab('all')}
           />
-          <input
-            type="date"
-            value={dateRange.end}
-            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+
+          <TabButton
+            label="Currently Borrowed"
+            active={activeTab === 'borrowed'}
+            onClick={() => setActiveTab('borrowed')}
+          />
+
+          <TabButton
+            label="Returned"
+            active={activeTab === 'returned'}
+            onClick={() => setActiveTab('returned')}
           />
         </div>
       </div>
 
-      {loading ? (
-        <p className="text-center text-gray-500 py-12">Loading transactions...</p>
-      ) : filteredTransactions.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <p className="text-gray-500 text-lg">No transactions found</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Student</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Item</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Borrow Date</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Due Date</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="min-w-[1050px]">
+            <div className="grid grid-cols-[1.6fr_1.2fr_0.9fr_0.9fr_0.9fr_0.8fr] px-8 py-6 bg-white border-b border-gray-200 text-[#64748B] font-medium">
+              <p>ITEM</p>
+              <p>STUDENT</p>
+              <p>BORROW DATE</p>
+              <p>DUE DATE</p>
+              <p>RETURN DATE</p>
+              <p>STATUS</p>
+            </div>
 
-            <tbody className="divide-y divide-gray-200">
-              {filteredTransactions.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">{t.studentName || 'N/A'}</div>
-                    <div className="text-xs text-gray-500">{t.studentId || 'N/A'}</div>
-                  </td>
+            {loading ? (
+              <div className="p-10 text-center text-[#64748B]">
+                Loading transactions...
+              </div>
+            ) : displayedTransactions.length === 0 ? (
+              <div className="p-10 text-center text-[#64748B]">
+                No transactions found.
+              </div>
+            ) : (
+              displayedTransactions.map((tx) => (
+                <div
+                  key={tx.id}
+                  className="grid grid-cols-[1.6fr_1.2fr_0.9fr_0.9fr_0.9fr_0.8fr] items-center px-8 py-6 border-b border-gray-200"
+                >
+                  <div className="flex items-center gap-4">
+                    <TransactionItemImage
+                      itemId={tx.itemId}
+                      itemName={tx.itemName}
+                    />
 
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">{t.itemName || 'N/A'}</div>
-                    <div className="text-xs font-mono text-gray-500">{t.serialNumber || 'N/A'}</div>
-                  </td>
+                    <div>
+                      <h3 className="text-[18px] font-semibold text-[#0F172A] leading-snug">
+                        {tx.itemName}
+                      </h3>
+                      <p className="text-[#64748B] text-sm mt-1">
+                        Serial #: {tx.serialNumber}
+                      </p>
+                    </div>
+                  </div>
 
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {t.borrowDate ? new Date(t.borrowDate).toLocaleDateString() : 'N/A'}
-                  </td>
+                  <div>
+                    <p className="text-[18px] font-semibold text-[#0F172A] leading-snug">
+                      {tx.studentName}
+                    </p>
+                    <p className="text-[#64748B] text-sm mt-1 break-all">
+                      {tx.studentIdentifier}
+                    </p>
+                  </div>
 
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'N/A'}
-                  </td>
+                  <p className="text-[#334155] text-base font-medium">
+                    {formatReadableDate(tx.borrowDate)}
+                  </p>
 
-                  <td className="px-6 py-4 text-sm">{getStatusBadge(t.status)}</td>
+                  <p className="text-[#334155] text-base font-medium">
+                    {formatReadableDate(tx.dueDate)}
+                  </p>
 
-                  <td className="px-6 py-4 text-sm text-right">
-                    <button
-                      onClick={() => {
-                        setViewingTransaction(t);
-                        setShowViewModal(true);
-                      }}
-                      className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+                  <p className="text-[#334155] text-base font-medium">
+                    {formatReadableDate(tx.returnDate)}
+                  </p>
+
+                  <div>
+                    <span
+                      className={`inline-flex px-4 py-2 rounded-full text-sm font-semibold ${getStatusClasses(
+                        tx.rawStatus
+                      )}`}
                     >
-                      <Eye className="w-4 h-4" />
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {showViewModal && viewingTransaction && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Transaction Details</h2>
-              <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {getStatusBadge(viewingTransaction.status)}
-              <p><strong>Student:</strong> {viewingTransaction.studentName || 'N/A'}</p>
-              <p><strong>Student ID:</strong> {viewingTransaction.studentId || 'N/A'}</p>
-              <p><strong>Item:</strong> {viewingTransaction.itemName || 'N/A'}</p>
-              <p><strong>Serial #:</strong> {viewingTransaction.serialNumber || 'N/A'}</p>
-              <p><strong>Borrow Date:</strong> {viewingTransaction.borrowDate || 'N/A'}</p>
-              <p><strong>Due Date:</strong> {viewingTransaction.dueDate || 'N/A'}</p>
-              <p><strong>Return Date:</strong> {viewingTransaction.returnDate || 'N/A'}</p>
-              <p><strong>Notes:</strong> {viewingTransaction.notes || 'N/A'}</p>
-
-              <button
-                onClick={() => setShowViewModal(false)}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg mt-6"
-              >
-                Close
-              </button>
-            </div>
+                      {tx.displayStatus}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
+}
+
+function SummaryCard({ label, value, blue, green }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+      <p className="text-[#64748B] text-sm mb-3">{label}</p>
+      <p
+        className={`text-4xl font-bold ${
+          blue ? 'text-[#2563EB]' : green ? 'text-[#10B981]' : 'text-[#0F172A]'
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function TabButton({ label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-6 py-3 rounded-2xl font-semibold transition-colors ${
+        active
+          ? 'bg-[#2563EB] text-white'
+          : 'bg-[#F1F5F9] text-[#334155] hover:bg-gray-200'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function normalizeBorrowTransaction(borrow, index) {
+  const rawStatus = String(borrow?.status || '').toUpperCase();
+  const displayStatus = rawStatus === 'ACTIVE' ? 'BORROWED' : rawStatus || 'N/A';
+
+  const studentName =
+    borrow?.studentName ||
+    borrow?.studentFullName ||
+    borrow?.fullName ||
+    borrow?.studentEmail ||
+    borrow?.studentId ||
+    'Unknown Student';
+
+  const studentIdentifier =
+    borrow?.studentIdentifier ||
+    borrow?.studentNumber ||
+    borrow?.studentCode ||
+    borrow?.studentEmail ||
+    borrow?.studentId ||
+    'N/A';
+
+  return {
+    id: borrow?.id || `borrow-${index}`,
+    itemId: borrow?.itemId || borrow?.item?.id || '',
+    itemName: borrow?.itemName || borrow?.item?.name || 'Unknown Item',
+    itemLocation:
+      borrow?.itemLocation ||
+      borrow?.location ||
+      borrow?.item?.location ||
+      'Campus',
+    serialNumber: borrow?.serialNumber || borrow?.item?.serialNumber || 'N/A',
+
+    studentName,
+    studentIdentifier,
+
+    borrowDate: borrow?.borrowDate || borrow?.createdAt || null,
+    dueDate: borrow?.dueDate || null,
+    returnDate: borrow?.returnDate || null,
+
+    rawStatus,
+    displayStatus,
+  };
+}
+
+function TransactionItemImage({ itemId, itemName }) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    let currentUrl = null;
+
+    const loadImage = async () => {
+      setUrl(null);
+
+      if (!itemId) return;
+
+      const blobUrl = await getItemPhotoBlobUrl(itemId);
+
+      if (active && blobUrl) {
+        currentUrl = blobUrl;
+        setUrl(blobUrl);
+      }
+    };
+
+    loadImage();
+
+    return () => {
+      active = false;
+
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+    };
+  }, [itemId]);
+
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={itemName || 'Item'}
+        className="w-16 h-16 rounded-2xl object-cover border border-gray-200 bg-white shrink-0"
+      />
+    );
+  }
+
+  return (
+    <div className="w-16 h-16 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+      <ImageIcon className="w-7 h-7 text-gray-400" />
+    </div>
+  );
+}
+
+function getStatusClasses(status) {
+  if (['ACTIVE', 'BORROWED', 'APPROVED', 'PENDING'].includes(status)) {
+    return 'bg-blue-100 text-[#2563EB]';
+  }
+
+  if (status === 'RETURNED') {
+    return 'bg-green-100 text-[#10B981]';
+  }
+
+  return 'bg-gray-100 text-gray-600';
+}
+
+function formatReadableDate(value) {
+  if (!value) return '-';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function cleanText(value) {
+  if (value === null || value === undefined || value === '') return 'N/A';
+
+  const text = String(value).trim();
+  return text === '' ? 'N/A' : text;
+}
+
+function csvEscape(value) {
+  const safe = value == null ? '' : String(value);
+  return `"${safe.replace(/"/g, '""')}"`;
 }

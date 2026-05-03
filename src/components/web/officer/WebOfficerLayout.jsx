@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import { getCurrentUser, getPhotoBlobUrl, logout } from '../../../api/auth';
 
+// Keeps the officer photo from blinking back to initials during route changes
+let cachedOfficerPhotoUrl = null;
+
 export function WebOfficerLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,31 +20,52 @@ export function WebOfficerLayout({ children }) {
 
   const [user, setUser] = useState(getCurrentUser());
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(cachedOfficerPhotoUrl);
 
   useEffect(() => {
     let active = true;
-    let currentPhotoUrl = null;
 
     const loadUserData = async () => {
       const currentUser = getCurrentUser();
+
       if (!active) return;
 
       setUser(currentUser);
 
-      if (currentPhotoUrl) {
-        URL.revokeObjectURL(currentPhotoUrl);
-        currentPhotoUrl = null;
+      // If there is already a cached image, keep showing it.
+      if (cachedOfficerPhotoUrl) {
+        setPhotoUrl(cachedOfficerPhotoUrl);
       }
 
-      setPhotoUrl(null);
-
-      if (currentUser?.hasPhoto) {
-        const blobUrl = await getPhotoBlobUrl();
-        if (active && blobUrl) {
-          currentPhotoUrl = blobUrl;
-          setPhotoUrl(blobUrl);
+      // If user has no photo, clear the photo safely.
+      if (!currentUser?.hasPhoto) {
+        if (cachedOfficerPhotoUrl) {
+          URL.revokeObjectURL(cachedOfficerPhotoUrl);
+          cachedOfficerPhotoUrl = null;
         }
+
+        if (active) {
+          setPhotoUrl(null);
+        }
+
+        return;
+      }
+
+      // User has a photo, fetch it without flashing initials first.
+      const blobUrl = await getPhotoBlobUrl();
+
+      if (!active) {
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
+        return;
+      }
+
+      if (blobUrl) {
+        if (cachedOfficerPhotoUrl) {
+          URL.revokeObjectURL(cachedOfficerPhotoUrl);
+        }
+
+        cachedOfficerPhotoUrl = blobUrl;
+        setPhotoUrl(blobUrl);
       }
     };
 
@@ -56,11 +80,8 @@ export function WebOfficerLayout({ children }) {
     return () => {
       active = false;
       window.removeEventListener('user-changed', handleUserChanged);
-      if (currentPhotoUrl) {
-        URL.revokeObjectURL(currentPhotoUrl);
-      }
     };
-  }, [location.pathname]);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -85,19 +106,24 @@ export function WebOfficerLayout({ children }) {
     user?.email?.split('@')[0] ||
     'Officer';
 
-  const initials = displayName
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+  const getInitials = (name) => {
+    const parts = name.trim().split(/\s+/);
+
+    if (parts.length === 1) {
+      return parts[0].charAt(0).toUpperCase();
+    }
+
+    return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+  };
+
+  const initials = getInitials(displayName);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex">
-      <aside className="w-[280px] bg-white border-r border-gray-200 min-h-screen hidden lg:block">
+      <aside className="w-[280px] bg-white border-r border-gray-200 min-h-screen sticky top-0 hidden lg:block">
         <div className="px-8 py-8 border-b border-gray-200">
           <h1 className="text-[28px] font-extrabold text-[#2563EB]">BorrowBox</h1>
-          <p className="text-sm text-[#64748b] mt-1">Officer Portal</p>
+          <p className="text-sm text-[#64748b] mt-1">Officer Dashboard</p>
         </div>
 
         <nav className="p-5 flex flex-col gap-3">
@@ -155,8 +181,7 @@ export function WebOfficerLayout({ children }) {
         <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
           <div className="px-6 md:px-10 h-20 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#0f172a]">Officer Dashboard</h2>
-              <p className="text-sm text-[#64748b]">Manage inventory and transactions</p>
+              <h2 className="text-xl font-bold text-[#0f172a]">Officer Portal</h2>
             </div>
 
             <div className="relative" ref={dropdownRef}>
