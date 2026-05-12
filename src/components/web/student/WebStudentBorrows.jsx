@@ -11,16 +11,26 @@ import {
   getItemPhotoBlobUrl
 } from '../../../api/borrowbox';
 
+const CONDITION_OPTIONS = [
+  'Good',
+  'Damaged',
+  'Lost',
+  'Needs Inspection'
+];
+
 export function WebStudentBorrows() {
   const [borrows, setBorrows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('current');
+
   const [selectedBorrow, setSelectedBorrow] = useState(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [returnLoading, setReturnLoading] = useState(false);
   const [returnError, setReturnError] = useState('');
+  const [returnCondition, setReturnCondition] = useState('Good');
+  const [returnNotes, setReturnNotes] = useState('');
 
   useEffect(() => {
     loadBorrows();
@@ -31,16 +41,27 @@ export function WebStudentBorrows() {
 
     try {
       const res = await getStudentBorrows();
-      if (res.success) setBorrows(res.borrows || []);
+
+      if (res.success) {
+        setBorrows(res.borrows || []);
+      } else {
+        setBorrows([]);
+      }
     } catch (err) {
       console.error('Failed to load borrows:', err);
+      setBorrows([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const currentBorrows = borrows.filter((b) => b.status === 'ACTIVE');
-  const historyBorrows = borrows.filter((b) => b.status !== 'ACTIVE');
+  const isActiveBorrow = (borrow) => {
+    const status = String(borrow.status || '').toUpperCase();
+    return ['ACTIVE', 'BORROWED', 'APPROVED', 'PENDING'].includes(status);
+  };
+
+  const currentBorrows = borrows.filter(isActiveBorrow);
+  const historyBorrows = borrows.filter((b) => !isActiveBorrow(b));
 
   const formatDate = (date) => {
     if (!date) return 'N/A';
@@ -61,6 +82,12 @@ export function WebStudentBorrows() {
   const getItemLocation = (borrow) =>
     borrow.itemLocation || borrow.item?.location || borrow.location || 'Campus';
 
+  const getCondition = (borrow) =>
+    borrow.condition || borrow.itemCondition || 'N/A';
+
+  const getNotes = (borrow) =>
+    borrow.notes && borrow.notes.trim() ? borrow.notes : 'No notes provided';
+
   const isOverdue = (dueDate) => {
     if (!dueDate) return false;
     return new Date(dueDate) < new Date();
@@ -68,6 +95,8 @@ export function WebStudentBorrows() {
 
   const openReturnModal = (borrow) => {
     setSelectedBorrow(borrow);
+    setReturnCondition('Good');
+    setReturnNotes('');
     setReturnError('');
     setShowReturnModal(true);
   };
@@ -77,16 +106,31 @@ export function WebStudentBorrows() {
 
     setShowReturnModal(false);
     setReturnError('');
+    setReturnCondition('Good');
+    setReturnNotes('');
   };
 
   const handleReturn = async () => {
     if (!selectedBorrow || returnLoading) return;
 
+    if (!returnCondition.trim()) {
+      setReturnError('Please select the item condition.');
+      return;
+    }
+
     setReturnLoading(true);
     setReturnError('');
 
     try {
-      await returnBorrow(selectedBorrow.id, 'Good');
+      const res = await returnBorrow(
+        selectedBorrow.id,
+        returnCondition,
+        returnNotes.trim()
+      );
+
+      if (res.success === false) {
+        throw new Error(res.message || 'Failed to return item.');
+      }
 
       setShowReturnModal(false);
       setShowSuccessModal(true);
@@ -204,11 +248,11 @@ export function WebStudentBorrows() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm w-full max-w-none">
-          <div className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr] px-8 py-5 bg-gray-50 text-gray-500 font-medium">
+          <div className="grid grid-cols-[1.5fr_0.9fr_0.55fr_1fr] px-8 py-5 bg-gray-50 text-gray-500 font-medium">
             <p>ITEM</p>
-            <p>BORROW DATE</p>
-            <p>RETURN DATE</p>
-            <p className="text-center">STATUS</p>
+            <p>DATES</p>
+            <p className="text-center">CONDITION</p>
+            <p>NOTES</p>
           </div>
 
           {historyBorrows.length === 0 ? (
@@ -226,7 +270,7 @@ export function WebStudentBorrows() {
               return (
                 <div
                   key={borrow.id}
-                  className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr] items-center px-8 py-6 border-t border-gray-200"
+                  className="grid grid-cols-[1.5fr_0.9fr_0.55fr_1fr] items-center px-8 py-6 border-t border-gray-200"
                 >
                   <div className="flex items-center gap-4">
                     <BorrowItemImage
@@ -239,29 +283,40 @@ export function WebStudentBorrows() {
                       <h3 className="text-xl font-bold text-gray-900">
                         {getItemName(borrow)}
                       </h3>
+
                       <p className="text-gray-500">{getItemLocation(borrow)}</p>
+
+                      <span
+                        className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${
+                          returnedLate
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}
+                      >
+                        {returnedLate ? 'Returned late' : 'Returned on time'}
+                      </span>
                     </div>
                   </div>
 
-                  <p className="text-lg text-gray-900">
-                    {formatDate(borrow.borrowDate)}
-                  </p>
+                  <div className="text-gray-900">
+                    <p className="text-base">
+                      <span className="font-semibold text-gray-500">Borrowed:</span>{' '}
+                      {formatDate(borrow.borrowDate)}
+                    </p>
 
-                  <p className="text-lg text-gray-900">
-                    {formatDate(borrow.returnDate)}
-                  </p>
+                    <p className="text-base mt-2">
+                      <span className="font-semibold text-gray-500">Returned:</span>{' '}
+                      {formatDate(borrow.returnDate)}
+                    </p>
+                  </div>
 
                   <div className="flex justify-center">
-                    <span
-                      className={`px-4 py-2 rounded-full font-medium ${
-                        returnedLate
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-green-100 text-green-700'
-                      }`}
-                    >
-                      {returnedLate ? 'Returned late' : 'Returned on time'}
-                    </span>
+                    <ConditionBadge condition={getCondition(borrow)} />
                   </div>
+
+                  <p className="text-sm text-gray-600 leading-snug">
+                    {getNotes(borrow)}
+                  </p>
                 </div>
               );
             })
@@ -271,15 +326,51 @@ export function WebStudentBorrows() {
 
       {showReturnModal && selectedBorrow && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md text-center">
-            <Clock className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md">
+            <div className="text-center">
+              <Clock className="w-16 h-16 text-red-500 mx-auto mb-4" />
 
-            <h2 className="text-2xl font-bold mb-3">Return Item?</h2>
+              <h2 className="text-2xl font-bold mb-3">Return Item</h2>
 
-            <p className="text-gray-600 mb-5">
-              Are you sure you want to return{' '}
-              <strong>{getItemName(selectedBorrow)}</strong>?
-            </p>
+              <p className="text-gray-600 mb-6">
+                Select the condition of{' '}
+                <strong>{getItemName(selectedBorrow)}</strong> before returning.
+              </p>
+            </div>
+
+            <div className="mb-5 text-left">
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Item Condition
+              </label>
+
+              <select
+                value={returnCondition}
+                onChange={(e) => setReturnCondition(e.target.value)}
+                disabled={returnLoading}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#10B981] focus:border-[#10B981]"
+              >
+                {CONDITION_OPTIONS.map((condition) => (
+                  <option key={condition} value={condition}>
+                    {condition}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-5 text-left">
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Notes Optional
+              </label>
+
+              <textarea
+                value={returnNotes}
+                onChange={(e) => setReturnNotes(e.target.value)}
+                disabled={returnLoading}
+                rows={3}
+                placeholder="Example: Item is working properly"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#10B981] focus:border-[#10B981] resize-none"
+              />
+            </div>
 
             {returnError && (
               <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 text-left">
@@ -327,6 +418,8 @@ export function WebStudentBorrows() {
                 setShowSuccessModal(false);
                 setSelectedBorrow(null);
                 setReturnError('');
+                setReturnCondition('Good');
+                setReturnNotes('');
                 setActiveTab('history');
               }}
               className="w-full bg-[#10B981] text-white py-3 rounded-xl font-bold"
@@ -337,6 +430,29 @@ export function WebStudentBorrows() {
         </div>
       )}
     </div>
+  );
+}
+
+function ConditionBadge({ condition }) {
+  const value = condition || 'N/A';
+  const normalized = value.toUpperCase();
+
+  let classes = 'bg-gray-100 text-gray-600';
+
+  if (normalized === 'GOOD') {
+    classes = 'bg-green-100 text-green-700';
+  } else if (normalized === 'DAMAGED') {
+    classes = 'bg-red-100 text-red-700';
+  } else if (normalized === 'LOST') {
+    classes = 'bg-orange-100 text-orange-700';
+  } else if (normalized === 'NEEDS INSPECTION') {
+    classes = 'bg-yellow-100 text-yellow-700';
+  }
+
+  return (
+    <span className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${classes}`}>
+      {value}
+    </span>
   );
 }
 

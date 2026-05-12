@@ -63,6 +63,8 @@ export function WebOfficerTransactions() {
       'Due Date',
       'Return Date',
       'Status',
+      'Condition',
+      'Notes',
     ];
 
     const rows = displayedTransactions.map((tx) => [
@@ -74,6 +76,8 @@ export function WebOfficerTransactions() {
       csvEscape(formatReadableDate(tx.dueDate)),
       csvEscape(formatReadableDate(tx.returnDate)),
       csvEscape(cleanText(tx.displayStatus)),
+      csvEscape(cleanText(tx.condition)),
+      csvEscape(cleanText(tx.notes)),
     ]);
 
     const csvContent = [
@@ -153,14 +157,14 @@ export function WebOfficerTransactions() {
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <div className="min-w-[1050px]">
-            <div className="grid grid-cols-[1.6fr_1.2fr_0.9fr_0.9fr_0.9fr_0.8fr] px-8 py-6 bg-white border-b border-gray-200 text-[#64748B] font-medium">
+          <div className="min-w-[1150px]">
+            <div className="grid grid-cols-[1.35fr_1fr_1fr_0.7fr_0.8fr_1fr] px-8 py-6 bg-white border-b border-gray-200 text-[#64748B] font-medium">
               <p>ITEM</p>
               <p>STUDENT</p>
-              <p>BORROW DATE</p>
-              <p>DUE DATE</p>
-              <p>RETURN DATE</p>
+              <p>DATES</p>
               <p>STATUS</p>
+              <p>CONDITION</p>
+              <p>NOTES</p>
             </div>
 
             {loading ? (
@@ -175,7 +179,7 @@ export function WebOfficerTransactions() {
               displayedTransactions.map((tx) => (
                 <div
                   key={tx.id}
-                  className="grid grid-cols-[1.6fr_1.2fr_0.9fr_0.9fr_0.9fr_0.8fr] items-center px-8 py-6 border-b border-gray-200"
+                  className="grid grid-cols-[1.35fr_1fr_1fr_0.7fr_0.8fr_1fr] items-center px-8 py-6 border-b border-gray-200"
                 >
                   <div className="flex items-center gap-4">
                     <TransactionItemImage
@@ -187,6 +191,7 @@ export function WebOfficerTransactions() {
                       <h3 className="text-[18px] font-semibold text-[#0F172A] leading-snug">
                         {tx.itemName}
                       </h3>
+
                       <p className="text-[#64748B] text-sm mt-1">
                         Serial #: {tx.serialNumber}
                       </p>
@@ -197,32 +202,46 @@ export function WebOfficerTransactions() {
                     <p className="text-[18px] font-semibold text-[#0F172A] leading-snug">
                       {tx.studentName}
                     </p>
+
                     <p className="text-[#64748B] text-sm mt-1 break-all">
                       {tx.studentIdentifier}
                     </p>
                   </div>
 
-                  <p className="text-[#334155] text-base font-medium">
-                    {formatReadableDate(tx.borrowDate)}
-                  </p>
+                  <div className="text-[#334155] text-sm leading-relaxed">
+                    <p>
+                      <span className="font-semibold text-[#64748B]">Borrowed:</span>{' '}
+                      {formatReadableDate(tx.borrowDate)}
+                    </p>
 
-                  <p className="text-[#334155] text-base font-medium">
-                    {formatReadableDate(tx.dueDate)}
-                  </p>
+                    <p>
+                      <span className="font-semibold text-[#64748B]">Due:</span>{' '}
+                      {formatReadableDate(tx.dueDate)}
+                    </p>
 
-                  <p className="text-[#334155] text-base font-medium">
-                    {formatReadableDate(tx.returnDate)}
-                  </p>
+                    <p>
+                      <span className="font-semibold text-[#64748B]">Returned:</span>{' '}
+                      {formatReadableDate(tx.returnDate)}
+                    </p>
+                  </div>
 
                   <div>
                     <span
-                      className={`inline-flex px-4 py-2 rounded-full text-sm font-semibold ${getStatusClasses(
+                      className={`inline-flex px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap ${getStatusClasses(
                         tx.rawStatus
                       )}`}
                     >
                       {tx.displayStatus}
                     </span>
                   </div>
+
+                  <div>
+                    <ConditionBadge condition={tx.condition} />
+                  </div>
+
+                  <p className="text-[#64748B] text-sm leading-snug">
+                    {tx.notes && tx.notes.trim() ? tx.notes : 'No notes'}
+                  </p>
                 </div>
               ))
             )}
@@ -304,6 +323,9 @@ function normalizeBorrowTransaction(borrow, index) {
 
     rawStatus,
     displayStatus,
+
+    condition: borrow?.condition || 'N/A',
+    notes: borrow?.notes || '',
   };
 }
 
@@ -352,6 +374,29 @@ function TransactionItemImage({ itemId, itemName }) {
     <div className="w-16 h-16 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
       <ImageIcon className="w-7 h-7 text-gray-400" />
     </div>
+  );
+}
+
+function ConditionBadge({ condition }) {
+  const value = condition || 'N/A';
+  const normalized = value.toUpperCase();
+
+  let classes = 'bg-gray-100 text-gray-600';
+
+  if (normalized === 'GOOD') {
+    classes = 'bg-green-100 text-green-700';
+  } else if (normalized === 'DAMAGED') {
+    classes = 'bg-red-100 text-red-700';
+  } else if (normalized === 'LOST') {
+    classes = 'bg-orange-100 text-orange-700';
+  } else if (normalized === 'NEEDS INSPECTION') {
+    classes = 'bg-yellow-100 text-yellow-700';
+  }
+
+  return (
+    <span className={`inline-flex px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap ${classes}`}>
+      {value}
+    </span>
   );
 }
 

@@ -89,10 +89,12 @@ export const getStudentBorrows = async () => {
   return res.data;
 };
 
-export const returnBorrow = async (borrowId, condition = 'Good') => {
+export const returnBorrow = async (borrowId, condition = 'Good', notes = '') => {
   const res = await api.post(`/borrows/${borrowId}/return`, {
     condition,
+    notes,
   });
+
   return res.data;
 };
 
