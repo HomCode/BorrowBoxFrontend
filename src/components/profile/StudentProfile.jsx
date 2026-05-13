@@ -4,7 +4,8 @@ import {
   Mail,
   IdCard,
   Lock,
-  Bell
+  Bell,
+  Clock
 } from 'lucide-react';
 
 import {
@@ -561,10 +562,11 @@ const StudentProfile = ({ initialProfile, initialUser }) => {
                 </label>
 
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-lg text-gray-800">
+                   <span className="flex items-center gap-4 text-lg text-gray-800">
+                    <Clock className="w-6 h-6 text-gray-400" />
                     Borrow Reminders
-                  </span>
-                  <input type="checkbox" defaultChecked className="w-5 h-5" />
+                   </span>
+                <input type="checkbox" defaultChecked className="w-5 h-5" />
                 </label>
               </div>
             </div>

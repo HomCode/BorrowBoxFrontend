@@ -337,14 +337,6 @@ export function WebOfficerItems() {
             Add, edit, and organize borrowable items
           </p>
         </div>
-
-        <button
-          onClick={handleAddClick}
-          className="px-6 py-3 bg-[#2563EB] text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Add New Item
-        </button>
       </div>
 
       {error && (

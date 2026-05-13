@@ -33,6 +33,17 @@ import {
   ReadOnlyField
 } from './ProfileShared';
 
+const getInitials = (name, email) => {
+  const value = String(name || email || 'Officer').trim();
+  const parts = value.split(' ').filter(Boolean);
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+
+  return value.slice(0, 2).toUpperCase();
+};
+
 const OfficerProfile = ({ initialProfile, initialUser }) => {
   const [profile, setProfile] = useState(initialProfile || null);
   const [user, setUser] = useState(initialUser || null);
@@ -331,8 +342,8 @@ const OfficerProfile = ({ initialProfile, initialUser }) => {
                   className="w-36 h-36 rounded-full object-cover mb-6"
                 />
               ) : (
-                <div className="w-36 h-36 rounded-full border-2 border-gray-300 bg-white text-gray-400 flex items-center justify-center mb-6 shadow-sm">
-                  <User className="w-16 h-16" />
+                <div className="w-36 h-36 rounded-full bg-[#2563EB] text-white flex items-center justify-center mb-6 shadow-sm text-4xl font-bold">
+                 {getInitials(displayName, emailValue)}
                 </div>
               )}
 

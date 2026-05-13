@@ -95,7 +95,7 @@ export function PasswordModal({
   onSubmit
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
       <div className="bg-white rounded-2xl shadow-xl w-[420px] p-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-900">Change Password</h2>
@@ -120,12 +120,13 @@ export function PasswordModal({
             type="password"
             placeholder="Current password"
             value={passwordForm.currentPassword}
+            autoComplete="current-password"
             className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#2563EB]"
             onChange={(e) =>
-              setPasswordForm({
-                ...passwordForm,
+              setPasswordForm((prev) => ({
+                ...prev,
                 currentPassword: e.target.value
-              })
+              }))
             }
           />
 
@@ -133,12 +134,13 @@ export function PasswordModal({
             type="password"
             placeholder="New password"
             value={passwordForm.newPassword}
+            autoComplete="new-password"
             className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#2563EB]"
             onChange={(e) =>
-              setPasswordForm({
-                ...passwordForm,
+              setPasswordForm((prev) => ({
+                ...prev,
                 newPassword: e.target.value
-              })
+              }))
             }
           />
 
@@ -146,12 +148,13 @@ export function PasswordModal({
             type="password"
             placeholder="Confirm new password"
             value={passwordForm.confirmPassword}
+            autoComplete="new-password"
             className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#2563EB]"
             onChange={(e) =>
-              setPasswordForm({
-                ...passwordForm,
+              setPasswordForm((prev) => ({
+                ...prev,
                 confirmPassword: e.target.value
-              })
+              }))
             }
           />
         </div>
